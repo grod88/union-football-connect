@@ -63,41 +63,49 @@ const ObsEvents = () => {
   }
 
   return (
-    <OBSLayout className="p-4">
-      {/* Team headers */}
-      {fixture && (
-        <div className="flex justify-between items-center mb-4 px-2">
-          <TeamBadge
-            team={fixture.homeTeam}
-            size="sm"
-            namePosition="right"
-          />
-          <span className="text-white/60 text-xs uppercase tracking-wider">
-            Eventos
-          </span>
-          <TeamBadge
-            team={fixture.awayTeam}
-            size="sm"
-            namePosition="right"
-          />
-        </div>
-      )}
+    <OBSLayout className="p-2">
+      <div
+        className="rounded-xl overflow-hidden p-4"
+        style={{
+          background: 'linear-gradient(135deg, rgba(30,25,22,0.95) 0%, rgba(20,18,16,0.98) 100%)',
+          border: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        {/* Team headers */}
+        {fixture && (
+          <div className="flex justify-between items-center mb-4 px-2">
+            <TeamBadge
+              team={fixture.homeTeam}
+              size="sm"
+              namePosition="right"
+            />
+            <span className="text-white/60 text-xs uppercase tracking-wider">
+              Eventos
+            </span>
+            <TeamBadge
+              team={fixture.awayTeam}
+              size="sm"
+              namePosition="right"
+            />
+          </div>
+        )}
 
-      {/* Events timeline */}
-      {fixture && events && (
-        <EventTimeline
-          events={events}
-          homeTeamId={fixture.homeTeam.id}
-          variant="obs"
-          maxEvents={maxEvents}
-        />
-      )}
+        {/* Events timeline */}
+        {fixture && events && (
+          <EventTimeline
+            events={events}
+            homeTeamId={fixture.homeTeam.id}
+            variant="obs"
+            maxEvents={maxEvents}
+          />
+        )}
 
-      {events?.length === 0 && (
-        <div className="text-center py-8 text-white/40">
-          Aguardando eventos...
-        </div>
-      )}
+        {events?.length === 0 && (
+          <div className="text-center py-8 text-white/40">
+            Aguardando eventos...
+          </div>
+        )}
+      </div>
     </OBSLayout>
   );
 };
