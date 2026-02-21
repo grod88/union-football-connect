@@ -38,7 +38,7 @@ export const EventItem = ({
           className
         )}
       >
-        <span className="text-sm font-mono text-white/60 w-12 text-center">
+        <span className="text-base font-bold font-mono text-white/60 w-12 text-center">
           {time}
         </span>
         <EventIcon type={event.type} detail={event.detail} size="md" />
@@ -48,11 +48,11 @@ export const EventItem = ({
             isHomeTeam ? 'items-start' : 'items-end'
           )}
         >
-          <span className="text-sm font-semibold text-white">
+          <span className="text-lg font-bold text-white">
             {playerDisplay}
           </span>
           {event.detail && event.type === EventType.GOAL && (
-            <span className="text-xs text-white/60">
+            <span className="text-sm font-bold text-white/60">
               {event.assist?.name && `Assist: ${event.assist.name}`}
             </span>
           )}
