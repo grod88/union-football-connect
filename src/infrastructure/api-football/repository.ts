@@ -50,7 +50,9 @@ export class ApiFootballRepository implements IFootballRepository {
     try {
       const today = new Date().toISOString().split('T')[0];
       const season = options?.season ?? CURRENT_SEASON;
-      let endpoint = `/fixtures?team=${teamId}&season=${season}&from=${today}`;
+      // API-Football requires both 'from' and 'to' when using date range
+      const endOfYear = `${season}-12-31`;
+      let endpoint = `/fixtures?team=${teamId}&season=${season}&from=${today}&to=${endOfYear}`;
       if (options?.leagueId) endpoint += `&league=${options.leagueId}`;
 
       const response = await apiFootballClient.get<FixtureDTO[]>(endpoint);

@@ -38,8 +38,7 @@ serve(async (req) => {
     const response = await fetch(apiUrl, {
       method: "GET",
       headers: {
-        "x-rapidapi-key": apiKey,
-        "x-rapidapi-host": apiHost,
+        "x-apisports-key": apiKey,
       },
     });
 
