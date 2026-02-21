@@ -2,11 +2,47 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// OBS Pages
+import { ObsScoreboard, ObsStats, ObsEvents, ObsPoll } from "@/presentation/pages/obs";
+
+// Site Pages
+import { LiveDashboard, JoinUs } from "@/presentation/pages/site";
+
+// Route configuration
+import { ROUTES, isOBSRoute } from "@/config/routes";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+// Component to handle OBS-specific body class
+const OBSBodyHandler = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (isOBSRoute(location.pathname)) {
+      document.body.classList.add('obs-mode');
+    } else {
+      document.body.classList.remove('obs-mode');
+    }
+
+    return () => {
+      document.body.classList.remove('obs-mode');
+    };
+  }, [location.pathname]);
+
+  return null;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -14,9 +50,20 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <OBSBodyHandler />
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          {/* Public Pages */}
+          <Route path={ROUTES.HOME} element={<Index />} />
+          <Route path={ROUTES.LIVE} element={<LiveDashboard />} />
+          <Route path={ROUTES.JOIN_US} element={<JoinUs />} />
+
+          {/* OBS Overlay Pages (transparent, no chrome) */}
+          <Route path={ROUTES.OBS_SCOREBOARD} element={<ObsScoreboard />} />
+          <Route path={ROUTES.OBS_STATS} element={<ObsStats />} />
+          <Route path={ROUTES.OBS_EVENTS} element={<ObsEvents />} />
+          <Route path={ROUTES.OBS_POLL} element={<ObsPoll />} />
+
+          {/* Catch-all for 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

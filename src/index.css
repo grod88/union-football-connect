@@ -109,3 +109,38 @@
 .animate-pulse-live {
   animation: pulse-live 1.5s ease-in-out infinite;
 }
+
+/* OBS Mode - Transparent background for Browser Source */
+body.obs-mode {
+  background: transparent !important;
+  min-height: 100vh;
+}
+
+body.obs-mode #root {
+  background: transparent !important;
+}
+
+/* Hide scrollbars in OBS mode */
+body.obs-mode::-webkit-scrollbar {
+  display: none;
+}
+
+body.obs-mode {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* OBS specific font sizes for better readability */
+@layer utilities {
+  .obs-text-lg {
+    font-size: clamp(1rem, 2.5vw, 1.5rem);
+  }
+
+  .obs-text-xl {
+    font-size: clamp(1.25rem, 3vw, 2rem);
+  }
+
+  .obs-text-2xl {
+    font-size: clamp(1.5rem, 4vw, 3rem);
+  }
+}
