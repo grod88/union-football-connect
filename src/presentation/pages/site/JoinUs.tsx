@@ -110,6 +110,7 @@ function useTeamsByCountry(country: string) {
 // --- Hook: useDetectCountry ---
 function useDetectCountry() {
   const [detectedCountry, setDetectedCountry] = useState('');
+  const [detecting, setDetecting] = useState(true);
 
   useEffect(() => {
     const detect = async () => {
@@ -118,21 +119,23 @@ function useDetectCountry() {
         if (res.ok) {
           const data = await res.json();
           const code = data.country_code?.toUpperCase();
-          if (code && COUNTRIES.some((c) => c.code === code)) {
+          if (code) {
             setDetectedCountry(code);
           }
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore */ } finally {
+        setDetecting(false);
+      }
     };
     detect();
   }, []);
 
-  return detectedCountry;
+  return { detectedCountry, detecting };
 }
 
 // --- Main Component ---
 const JoinUs = () => {
-  const detectedCountry = useDetectCountry();
+  const { detectedCountry, detecting } = useDetectCountry();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -297,12 +300,19 @@ const JoinUs = () => {
                   {/* Country */}
                   <div>
                     <label htmlFor="country" className="block text-sm font-medium mb-1">País / Country</label>
-                    <select id="country" name="country" value={formData.country} onChange={handleChange} className={inputClass}>
-                      <option value="">Selecione...</option>
-                      {COUNTRIES.map((c) => (
-                        <option key={c.code} value={c.code}>{c.label}</option>
-                      ))}
-                    </select>
+                    {detecting ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Detectando localização...
+                      </div>
+                    ) : (
+                      <select id="country" name="country" value={formData.country} onChange={handleChange} className={inputClass}>
+                        <option value="">Selecione...</option>
+                        {COUNTRIES.map((c) => (
+                          <option key={c.code} value={c.code}>{c.label}</option>
+                        ))}
+                      </select>
+                    )}
                     {errors.country && <p className="text-sm text-destructive mt-1">{errors.country}</p>}
                   </div>
 
