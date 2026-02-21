@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { Navigate } from "react-router-dom";
 import { LanguageProvider } from "@/i18n";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -57,6 +58,7 @@ const App = () => (
             <Route path={ROUTES.LIVE} element={<LiveDashboard />} />
             <Route path={ROUTES.TODAY_MATCHES} element={<TodayMatches />} />
             <Route path={ROUTES.JOIN_US} element={<JoinUs />} />
+            <Route path={ROUTES.COMMUNITY} element={<Navigate to={ROUTES.JOIN_US} replace />} />
 
             {/* OBS Overlay Pages */}
             <Route path={ROUTES.OBS_SCOREBOARD} element={<ObsScoreboard />} />
