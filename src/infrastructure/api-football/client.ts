@@ -1,8 +1,7 @@
 /**
  * API-Football HTTP Client
- * Configured HTTP client for making requests to API-Football
+ * Routes requests through Edge Function proxy to avoid CORS issues
  */
-import { API_CONFIG } from '@/config/api.config';
 
 export interface ApiResponse<T> {
   get: string;
@@ -17,28 +16,22 @@ export interface ApiResponse<T> {
 }
 
 export class ApiFootballClient {
-  private baseUrl: string;
-  private headers: HeadersInit;
-
-  constructor() {
-    this.baseUrl = API_CONFIG.baseUrl;
-    this.headers = {
-      'x-rapidapi-key': API_CONFIG.key,
-      'x-rapidapi-host': API_CONFIG.host,
-    };
-  }
-
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}${endpoint}`;
-
     try {
-      const response = await fetch(url, {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const functionUrl = `https://${projectId}.supabase.co/functions/v1/api-football-proxy?endpoint=${encodeURIComponent(endpoint)}`;
+
+      const response = await fetch(functionUrl, {
         method: 'GET',
-        headers: this.headers,
+        headers: {
+          'Authorization': `Bearer ${anonKey}`,
+          'apikey': anonKey,
+        },
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        throw new Error(`Proxy request failed: ${response.status} ${response.statusText}`);
       }
 
       const data: ApiResponse<T> = await response.json();
