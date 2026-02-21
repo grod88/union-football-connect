@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import heroStadium from "@/assets/hero-stadium.jpg";
 import logoUnion from "@/assets/logo-union.jpg";
-import { Instagram, Youtube } from "lucide-react";
+import { Instagram, Youtube, Mail } from "lucide-react";
+import { SOCIAL_LINKS } from "@/lib/constants";
 
 const HeroSection = () => {
   return (
@@ -55,17 +56,20 @@ const HeroSection = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.8, duration: 0.6 }}
         >
-          <SocialIcon href="https://instagram.com/unionfootball.live" label="Instagram">
+          <SocialIcon href={SOCIAL_LINKS.instagram} label="Instagram">
             <Instagram size={28} />
           </SocialIcon>
-          <SocialIcon href="https://youtube.com/@UnionFootballLive" label="YouTube">
+          <SocialIcon href={SOCIAL_LINKS.youtube} label="YouTube">
             <Youtube size={28} />
           </SocialIcon>
-          <SocialIcon href="https://tiktok.com/@unionfootball.live" label="TikTok">
+          <SocialIcon href={SOCIAL_LINKS.tiktok} label="TikTok">
             <TikTokIcon />
           </SocialIcon>
-          <SocialIcon href="#" label="Discord">
+          <SocialIcon href={SOCIAL_LINKS.discord} label="Discord">
             <DiscordIcon />
+          </SocialIcon>
+          <SocialIcon href={`mailto:${SOCIAL_LINKS.email}`} label="Email">
+            <Mail size={28} />
           </SocialIcon>
         </motion.div>
       </div>
