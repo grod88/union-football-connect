@@ -2,10 +2,9 @@
  * API-Football configuration
  * Centralized API settings and endpoints
  */
-import { API_FOOTBALL_KEY, API_FOOTBALL_HOST } from '@/lib/constants';
+const API_FOOTBALL_HOST = 'v3.football.api-sports.io';
 
 export const API_CONFIG = {
-  key: API_FOOTBALL_KEY,
   host: API_FOOTBALL_HOST,
   baseUrl: `https://${API_FOOTBALL_HOST}`,
 } as const;
