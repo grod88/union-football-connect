@@ -1,12 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const ALLOWED_ORIGINS = [
-  "https://unionfc.lovable.app",
-  "https://id-preview--e2e1926c-68b6-4fa8-8683-e00206f8aa61.lovable.app",
-  "http://localhost:8080",
-  "http://localhost:5173",
-];
-
 const ALLOWED_ENDPOINT_PREFIXES = [
   "/fixtures",
   "/standings",
@@ -14,11 +7,19 @@ const ALLOWED_ENDPOINT_PREFIXES = [
   "/players",
 ];
 
+function isOriginAllowed(origin: string): boolean {
+  if (!origin) return false;
+  if (origin === "http://localhost:8080" || origin === "http://localhost:5173") return true;
+  if (origin.endsWith(".lovable.app") && origin.startsWith("https://")) return true;
+  if (origin.endsWith(".lovableproject.com") && origin.startsWith("https://")) return true;
+  return false;
+}
+
 function getCorsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowed = isOriginAllowed(origin);
   return {
-    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Origin": allowed ? origin : "https://unionfc.lovable.app",
     "Access-Control-Allow-Headers":
       "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
     "Access-Control-Allow-Credentials": "true",
