@@ -1,7 +1,10 @@
 import { motion } from "framer-motion";
 import { NextMatchCard } from "@/presentation/components/match/NextMatchCard";
+import { useLanguage } from "@/i18n";
 
 const NextMatchSection = () => {
+  const { t } = useLanguage();
+
   return (
     <section className="py-20 px-4">
       <div className="container mx-auto max-w-4xl">
@@ -11,9 +14,8 @@ const NextMatchSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
         >
-          Próximo Jogo
+          {t.nextMatch.title}
         </motion.h2>
-
         <NextMatchCard />
       </div>
     </section>

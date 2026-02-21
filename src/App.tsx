@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { LanguageProvider } from "@/i18n";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
@@ -12,6 +13,7 @@ import { ObsScoreboard, ObsStats, ObsEvents, ObsPoll } from "@/presentation/page
 
 // Site Pages
 import { LiveDashboard, JoinUs } from "@/presentation/pages/site";
+import TodayMatches from "@/presentation/pages/site/TodayMatches";
 
 // Route configuration
 import { ROUTES, isOBSRoute } from "@/config/routes";
@@ -35,10 +37,7 @@ const OBSBodyHandler = () => {
     } else {
       document.body.classList.remove('obs-mode');
     }
-
-    return () => {
-      document.body.classList.remove('obs-mode');
-    };
+    return () => { document.body.classList.remove('obs-mode'); };
   }, [location.pathname]);
 
   return null;
@@ -46,28 +45,31 @@ const OBSBodyHandler = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <OBSBodyHandler />
-        <Routes>
-          {/* Public Pages */}
-          <Route path={ROUTES.HOME} element={<Index />} />
-          <Route path={ROUTES.LIVE} element={<LiveDashboard />} />
-          <Route path={ROUTES.JOIN_US} element={<JoinUs />} />
+    <LanguageProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <OBSBodyHandler />
+          <Routes>
+            {/* Public Pages */}
+            <Route path={ROUTES.HOME} element={<Index />} />
+            <Route path={ROUTES.LIVE} element={<LiveDashboard />} />
+            <Route path={ROUTES.TODAY_MATCHES} element={<TodayMatches />} />
+            <Route path={ROUTES.JOIN_US} element={<JoinUs />} />
 
-          {/* OBS Overlay Pages (transparent, no chrome) */}
-          <Route path={ROUTES.OBS_SCOREBOARD} element={<ObsScoreboard />} />
-          <Route path={ROUTES.OBS_STATS} element={<ObsStats />} />
-          <Route path={ROUTES.OBS_EVENTS} element={<ObsEvents />} />
-          <Route path={ROUTES.OBS_POLL} element={<ObsPoll />} />
+            {/* OBS Overlay Pages */}
+            <Route path={ROUTES.OBS_SCOREBOARD} element={<ObsScoreboard />} />
+            <Route path={ROUTES.OBS_STATS} element={<ObsStats />} />
+            <Route path={ROUTES.OBS_EVENTS} element={<ObsEvents />} />
+            <Route path={ROUTES.OBS_POLL} element={<ObsPoll />} />
 
-          {/* Catch-all for 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+            {/* Catch-all */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </LanguageProvider>
   </QueryClientProvider>
 );
 
