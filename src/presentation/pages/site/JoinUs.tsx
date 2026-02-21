@@ -78,20 +78,14 @@ function useTeamsByCountry(country: string) {
         return;
       }
 
-      // If empty, call sync-teams to populate
-      const { data: fnData, error: fnError } = await supabase.functions.invoke('sync-teams', {
-        body: null,
-        method: 'GET',
-        headers: {},
-      });
-      // Use query params via direct fetch since invoke doesn't support query params well
+      // If empty, call sync-teams to populate cache
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-teams?country=${countryCode}`,
         { headers: { 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } },
       );
 
       if (res.ok) {
-        // Re-read from DB after sync
+        // Re-read from DB after sync (ordered)
         const { data: freshData } = await supabase
           .from('teams')
           .select('id, name, logo')
