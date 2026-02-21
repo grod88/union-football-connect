@@ -13,7 +13,7 @@ const Header = () => {
     { label: t.nav.live, href: "/ao-vivo" },
     { label: t.nav.todayMatches, href: "/jogos-do-dia" },
     { label: t.nav.joinUs, href: "/junte-se" },
-    { label: t.nav.community, href: "/comunidade" },
+    { label: t.nav.community, href: "/junte-se" },
   ];
 
   return (

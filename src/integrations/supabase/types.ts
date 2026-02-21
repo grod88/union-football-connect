@@ -14,7 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      community_members: {
+        Row: {
+          country: string
+          created_at: string
+          email: string
+          favorite_team_id: number | null
+          favorite_team_name: string | null
+          id: string
+          message: string | null
+          name: string
+        }
+        Insert: {
+          country: string
+          created_at?: string
+          email: string
+          favorite_team_id?: number | null
+          favorite_team_name?: string | null
+          id?: string
+          message?: string | null
+          name: string
+        }
+        Update: {
+          country?: string
+          created_at?: string
+          email?: string
+          favorite_team_id?: number | null
+          favorite_team_name?: string | null
+          id?: string
+          message?: string | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_members_favorite_team_id_fkey"
+            columns: ["favorite_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          country: string
+          country_name: string | null
+          created_at: string
+          id: number
+          logo: string | null
+          name: string
+        }
+        Insert: {
+          country: string
+          country_name?: string | null
+          created_at?: string
+          id: number
+          logo?: string | null
+          name: string
+        }
+        Update: {
+          country?: string
+          country_name?: string | null
+          created_at?: string
+          id?: number
+          logo?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
