@@ -13,6 +13,7 @@ interface StatComparisonProps {
   variant?: 'default' | 'obs';
   locale?: 'pt-BR' | 'en';
   maxStats?: number;
+  statsSlice?: { start: number; end: number };
 }
 
 export const StatComparison = ({
@@ -21,10 +22,14 @@ export const StatComparison = ({
   variant = 'default',
   locale = 'pt-BR',
   maxStats,
+  statsSlice,
 }: StatComparisonProps) => {
-  const statsToShow = maxStats
-    ? DISPLAY_STATISTICS.slice(0, maxStats)
-    : DISPLAY_STATISTICS;
+  let statsToShow = DISPLAY_STATISTICS;
+  if (statsSlice) {
+    statsToShow = DISPLAY_STATISTICS.slice(statsSlice.start, statsSlice.end);
+  } else if (maxStats) {
+    statsToShow = DISPLAY_STATISTICS.slice(0, maxStats);
+  }
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
