@@ -2,11 +2,12 @@
  * API-Football configuration
  * Centralized API settings and endpoints
  */
+import { API_FOOTBALL_KEY, API_FOOTBALL_HOST } from '@/lib/constants';
 
 export const API_CONFIG = {
-  key: import.meta.env.VITE_API_FOOTBALL_KEY || '',
-  host: import.meta.env.VITE_API_FOOTBALL_HOST || 'v3.football.api-sports.io',
-  baseUrl: `https://${import.meta.env.VITE_API_FOOTBALL_HOST || 'v3.football.api-sports.io'}`,
+  key: API_FOOTBALL_KEY,
+  host: API_FOOTBALL_HOST,
+  baseUrl: `https://${API_FOOTBALL_HOST}`,
 } as const;
 
 // API Endpoints

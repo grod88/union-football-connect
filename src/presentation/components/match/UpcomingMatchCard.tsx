@@ -110,7 +110,7 @@ export const UpcomingMatchCard = ({
         <TeamBadge
           team={fixture.awayTeam}
           size="sm"
-          namePosition="left"
+          namePosition="right"
           className="flex-1 justify-end"
         />
       </div>

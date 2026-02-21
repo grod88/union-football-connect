@@ -72,17 +72,16 @@ export const LiveMatchCard = ({
         <div className="flex flex-col items-center">
           <div className="flex items-center gap-2">
             <span className="font-heading text-3xl sm:text-4xl">
-              {fixture.score.home ?? '-'}
+              {fixture.goalsHome ?? '-'}
             </span>
             <span className="font-heading text-xl sm:text-2xl text-muted-foreground">:</span>
             <span className="font-heading text-3xl sm:text-4xl">
-              {fixture.score.away ?? '-'}
+              {fixture.goalsAway ?? '-'}
             </span>
           </div>
           {isLive && (
             <MatchTimer
-              elapsedMinutes={fixture.elapsedTime}
-              status={fixture.status}
+              fixture={fixture}
               size="sm"
               className="mt-1"
             />

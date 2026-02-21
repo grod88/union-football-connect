@@ -98,7 +98,7 @@ const LiveDashboard = () => {
               {displayFixture && !isLoadingFixture && (
                 <>
                   {/* Scoreboard */}
-                  <Scoreboard fixture={displayFixture} variant="full" />
+                  <Scoreboard fixture={displayFixture} variant="default" size="lg" />
 
                   {/* Stats and Events Grid */}
                   <div className="grid md:grid-cols-2 gap-6">
@@ -113,9 +113,7 @@ const LiveDashboard = () => {
                       {statistics ? (
                         <StatComparison
                           statistics={statistics}
-                          homeTeamName={displayFixture.homeTeam.name}
-                          awayTeamName={displayFixture.awayTeam.name}
-                          variant="compact"
+                          variant="default"
                         />
                       ) : (
                         <p className="text-sm text-muted-foreground text-center py-8">
