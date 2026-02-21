@@ -47,12 +47,23 @@ export class ApiFootballRepository implements IFootballRepository {
     options?: { next?: number; last?: number }
   ): Promise<Fixture[]> {
     try {
-      let endpoint = `/fixtures?team=${teamId}`;
-      if (options?.next) endpoint += `&next=${options.next}`;
-      if (options?.last) endpoint += `&last=${options.last}`;
+      // Use season + from (date) since free plan doesn't support &next= or &last=
+      const today = new Date().toISOString().split('T')[0];
+      const season = new Date().getFullYear();
+      let endpoint = `/fixtures?team=${teamId}&season=${season}&from=${today}`;
 
       const response = await apiFootballClient.get<FixtureDTO[]>(endpoint);
-      return mapFixturesFromDTO(response.response);
+      const fixtures = mapFixturesFromDTO(response.response);
+      
+      // Sort by date ascending and limit
+      fixtures.sort((a, b) => a.date.getTime() - b.date.getTime());
+      
+      // Filter only not-started matches for "next" queries
+      if (options?.next) {
+        const upcoming = fixtures.filter(f => f.status === 'NS' || f.status === 'TBD');
+        return upcoming.slice(0, options.next);
+      }
+      return fixtures;
     } catch (error) {
       console.error(`Error fetching fixtures for team ${teamId}:`, error);
       throw error;
