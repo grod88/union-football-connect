@@ -2,3 +2,8 @@ export { default as ObsScoreboard } from './ObsScoreboard';
 export { default as ObsStats } from './ObsStats';
 export { default as ObsEvents } from './ObsEvents';
 export { default as ObsPoll } from './ObsPoll';
+export { default as ObsLeagueName } from './ObsLeagueName';
+export { default as ObsHomeTeam } from './ObsHomeTeam';
+export { default as ObsAwayTeam } from './ObsAwayTeam';
+export { default as ObsScore } from './ObsScore';
+export { default as ObsMatchTime } from './ObsMatchTime';

@@ -23,6 +23,11 @@ export const ROUTES = {
   OBS_EVENTS: '/obs/eventos',
   OBS_FIELD: '/obs/campo',
   OBS_POLL: '/obs/enquete',
+  OBS_LEAGUE: '/obs/liga',
+  OBS_HOME: '/obs/home',
+  OBS_AWAY: '/obs/away',
+  OBS_SCORE: '/obs/score',
+  OBS_TIME: '/obs/tempo',
 } as const;
 
 // Helper to check if current route is an OBS route

@@ -10,7 +10,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 // OBS Pages
-import { ObsScoreboard, ObsStats, ObsEvents, ObsPoll } from "@/presentation/pages/obs";
+import { ObsScoreboard, ObsStats, ObsEvents, ObsPoll, ObsLeagueName, ObsHomeTeam, ObsAwayTeam, ObsScore, ObsMatchTime } from "@/presentation/pages/obs";
 
 // Site Pages
 import { LiveDashboard, JoinUs } from "@/presentation/pages/site";
@@ -65,6 +65,11 @@ const App = () => (
             <Route path={ROUTES.OBS_STATS} element={<ObsStats />} />
             <Route path={ROUTES.OBS_EVENTS} element={<ObsEvents />} />
             <Route path={ROUTES.OBS_POLL} element={<ObsPoll />} />
+            <Route path={ROUTES.OBS_LEAGUE} element={<ObsLeagueName />} />
+            <Route path={ROUTES.OBS_HOME} element={<ObsHomeTeam />} />
+            <Route path={ROUTES.OBS_AWAY} element={<ObsAwayTeam />} />
+            <Route path={ROUTES.OBS_SCORE} element={<ObsScore />} />
+            <Route path={ROUTES.OBS_TIME} element={<ObsMatchTime />} />
 
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
