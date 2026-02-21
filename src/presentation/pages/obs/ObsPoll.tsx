@@ -10,15 +10,14 @@ import { useSearchParams } from 'react-router-dom';
 import { OBSLayout } from '@/presentation/components/layout/OBSLayout';
 import { Poll } from '@/presentation/components/poll/Poll';
 import { createPollFromParams } from '@/application/services/poll.service';
+import { parsePositiveInt } from '@/lib/validation';
 
 const ObsPoll = () => {
   const [searchParams] = useSearchParams();
   const poll = createPollFromParams(searchParams);
 
   // Get optional simulation parameter
-  const simulateVotes = searchParams.get('simular')
-    ? parseInt(searchParams.get('simular')!, 10)
-    : 0;
+  const simulateVotes = parsePositiveInt(searchParams.get('simular'), 0)!;
 
   if (!poll) {
     return (

@@ -14,14 +14,12 @@ import { LoadingSpinner } from '@/presentation/components/common/LoadingSpinner'
 import { ErrorMessage } from '@/presentation/components/common/ErrorMessage';
 import { useFixtureForOBS } from '@/application/hooks/useFixture';
 import { useFixtureEventsForOBS } from '@/application/hooks/useFixtureEvents';
+import { parsePositiveInt } from '@/lib/validation';
 
 const ObsEvents = () => {
   const [searchParams] = useSearchParams();
-  const fixtureId = searchParams.get('fixture');
-  const maxEvents = searchParams.get('max')
-    ? parseInt(searchParams.get('max')!, 10)
-    : 8;
-  const fixtureIdNum = fixtureId ? parseInt(fixtureId, 10) : undefined;
+  const maxEvents = parsePositiveInt(searchParams.get('max'), 8)!;
+  const fixtureIdNum = parsePositiveInt(searchParams.get('fixture'));
 
   const {
     data: fixture,
@@ -35,7 +33,7 @@ const ObsEvents = () => {
     refetch,
   } = useFixtureEventsForOBS(fixtureIdNum);
 
-  if (!fixtureId) {
+  if (!fixtureIdNum) {
     return (
       <OBSLayout className="flex items-center justify-center p-4">
         <p className="text-white/60 text-sm">

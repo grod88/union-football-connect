@@ -12,19 +12,20 @@ import { Scoreboard } from '@/presentation/components/match/Scoreboard';
 import { LoadingSpinner } from '@/presentation/components/common/LoadingSpinner';
 import { ErrorMessage } from '@/presentation/components/common/ErrorMessage';
 import { useFixtureForOBS } from '@/application/hooks/useFixture';
+import { parsePositiveInt } from '@/lib/validation';
 
 const ObsScoreboard = () => {
   const [searchParams] = useSearchParams();
-  const fixtureId = searchParams.get('fixture');
+  const fixtureIdNum = parsePositiveInt(searchParams.get('fixture'));
 
   const {
     data: fixture,
     isLoading,
     error,
     refetch,
-  } = useFixtureForOBS(fixtureId ? parseInt(fixtureId, 10) : undefined);
+  } = useFixtureForOBS(fixtureIdNum);
 
-  if (!fixtureId) {
+  if (!fixtureIdNum) {
     return (
       <OBSLayout className="flex items-center justify-center p-4">
         <p className="text-white/60 text-sm">
