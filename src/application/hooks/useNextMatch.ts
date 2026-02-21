@@ -4,24 +4,28 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { footballRepository } from '@/infrastructure/api-football/repository';
-import { REFRESH_INTERVALS, TEAMS } from '@/config/constants';
+import { REFRESH_INTERVALS, TEAMS, LEAGUES, CURRENT_SEASON } from '@/config/constants';
 import type { Fixture } from '@/core/domain/entities/fixture';
 
 interface UseNextMatchOptions {
   teamId?: number;
+  leagueId?: number;
+  season?: number;
   enabled?: boolean;
 }
 
 export const useNextMatch = (options: UseNextMatchOptions = {}) => {
   const {
-    teamId = TEAMS.SAO_PAULO, // Default to São Paulo FC
+    teamId = TEAMS.SAO_PAULO,
+    leagueId = LEAGUES.PAULISTAO,
+    season = CURRENT_SEASON,
     enabled = true,
   } = options;
 
   return useQuery<Fixture | null, Error>({
-    queryKey: ['next-match', teamId],
+    queryKey: ['next-match', teamId, leagueId, season],
     queryFn: async () => {
-      const fixtures = await footballRepository.getFixturesByTeam(teamId, { next: 1 });
+      const fixtures = await footballRepository.getFixturesByTeam(teamId, { next: 1, leagueId, season });
       return fixtures[0] || null;
     },
     enabled,

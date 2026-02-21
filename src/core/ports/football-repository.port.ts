@@ -12,7 +12,7 @@ import type { LeagueStandings } from '../domain/entities/standing';
 export interface IFootballRepository {
   // Fixture queries
   getFixtureById(id: number): Promise<Fixture | null>;
-  getFixturesByTeam(teamId: number, options?: { next?: number; last?: number }): Promise<Fixture[]>;
+  getFixturesByTeam(teamId: number, options?: { next?: number; last?: number; leagueId?: number; season?: number }): Promise<Fixture[]>;
   getFixturesByLeague(leagueId: number, season: number): Promise<Fixture[]>;
   getLiveFixtures(): Promise<Fixture[]>;
 

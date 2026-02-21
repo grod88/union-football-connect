@@ -11,6 +11,7 @@ import type { LeagueStandings } from '@/core/domain/entities/standing';
 
 import { apiFootballClient } from './client';
 import { ENDPOINTS } from '@/config/api.config';
+import { CURRENT_SEASON } from '@/config/constants';
 
 import type { FixtureDTO } from './dtos/fixture.dto';
 import type { StatisticsDTO } from './dtos/statistics.dto';
@@ -44,13 +45,13 @@ export class ApiFootballRepository implements IFootballRepository {
 
   async getFixturesByTeam(
     teamId: number,
-    options?: { next?: number; last?: number }
+    options?: { next?: number; last?: number; leagueId?: number; season?: number }
   ): Promise<Fixture[]> {
     try {
-      // Use season + from (date) since free plan doesn't support &next= or &last=
       const today = new Date().toISOString().split('T')[0];
-      const season = new Date().getFullYear();
+      const season = options?.season ?? CURRENT_SEASON;
       let endpoint = `/fixtures?team=${teamId}&season=${season}&from=${today}`;
+      if (options?.leagueId) endpoint += `&league=${options.leagueId}`;
 
       const response = await apiFootballClient.get<FixtureDTO[]>(endpoint);
       const fixtures = mapFixturesFromDTO(response.response);
