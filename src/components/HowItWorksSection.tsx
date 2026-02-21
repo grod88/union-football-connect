@@ -1,25 +1,16 @@
 import { motion } from "framer-motion";
 import { CalendarDays, Video, Globe } from "lucide-react";
-
-const steps = [
-  {
-    icon: CalendarDays,
-    title: "Escolhemos o Jogo",
-    description: "Selecionamos os melhores jogos da rodada para assistir juntos.",
-  },
-  {
-    icon: Video,
-    title: "Abrimos a Live",
-    description: "Entramos ao vivo no YouTube com comentários e reações em tempo real.",
-  },
-  {
-    icon: Globe,
-    title: "Assistimos Juntos",
-    description: "Torcedores do Brasil, Nova Zelândia e do mundo inteiro conectados pelo futebol.",
-  },
-];
+import { useLanguage } from "@/i18n";
 
 const HowItWorksSection = () => {
+  const { t } = useLanguage();
+
+  const steps = [
+    { icon: CalendarDays, title: t.howItWorks.step1Title, description: t.howItWorks.step1Desc },
+    { icon: Video, title: t.howItWorks.step2Title, description: t.howItWorks.step2Desc },
+    { icon: Globe, title: t.howItWorks.step3Title, description: t.howItWorks.step3Desc },
+  ];
+
   return (
     <section className="py-20 px-4">
       <div className="container mx-auto max-w-5xl">
@@ -29,13 +20,13 @@ const HowItWorksSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
         >
-          Como Funciona
+          {t.howItWorks.title}
         </motion.h2>
 
         <div className="grid md:grid-cols-3 gap-8">
           {steps.map((step, i) => (
             <motion.div
-              key={step.title}
+              key={i}
               className="card-surface rounded-xl p-8 text-center hover:gold-glow transition-shadow duration-500"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}

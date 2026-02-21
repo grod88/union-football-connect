@@ -7,7 +7,7 @@ export const ROUTES = {
   // Public pages
   HOME: '/',
   LIVE: '/ao-vivo',
-  CALENDAR: '/calendario',
+  TODAY_MATCHES: '/jogos-do-dia',
   JOIN_US: '/junte-se',
   WHERE_FROM: '/de-onde-assiste',
   HISTORY: '/historico',

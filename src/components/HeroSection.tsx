@@ -3,8 +3,11 @@ import heroStadium from "@/assets/hero-stadium.jpg";
 import logoUnion from "@/assets/logo-union.jpg";
 import { Instagram, Youtube, Mail } from "lucide-react";
 import { SOCIAL_LINKS } from "@/lib/constants";
+import { useLanguage } from "@/i18n";
 
 const HeroSection = () => {
+  const { t } = useLanguage();
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       <img
@@ -39,7 +42,7 @@ const HeroSection = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.5, duration: 0.6 }}
         >
-          O Futebol é Melhor Junto
+          {t.hero.tagline}
         </motion.p>
         <motion.p
           className="text-sm sm:text-base text-muted-foreground tracking-widest uppercase mb-10"
@@ -47,7 +50,7 @@ const HeroSection = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.6, duration: 0.6 }}
         >
-          Football is Better Together
+          {t.hero.taglineSub}
         </motion.p>
 
         <motion.div

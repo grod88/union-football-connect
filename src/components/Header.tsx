@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Globe } from "lucide-react";
 import logoUnion from "@/assets/logo-union.jpg";
-
-const navItems = [
-  { label: "Início", href: "/" },
-  { label: "Ao Vivo", href: "/ao-vivo" },
-  { label: "Calendário", href: "/calendario" },
-  { label: "Junte-se", href: "/junte-se" },
-  { label: "Comunidade", href: "/comunidade" },
-];
+import { useLanguage } from "@/i18n";
 
 const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { t, locale, toggleLocale } = useLanguage();
+
+  const navItems = [
+    { label: t.nav.home, href: "/" },
+    { label: t.nav.live, href: "/ao-vivo" },
+    { label: t.nav.todayMatches, href: "/jogos-do-dia" },
+    { label: t.nav.joinUs, href: "/junte-se" },
+    { label: t.nav.community, href: "/comunidade" },
+  ];
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -34,6 +36,16 @@ const Header = () => {
               {item.label}
             </Link>
           ))}
+          <button
+            onClick={toggleLocale}
+            className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors ml-2"
+            aria-label="Toggle language"
+          >
+            <Globe size={16} />
+            <span className="font-heading text-xs uppercase tracking-wider">
+              {locale === 'pt-BR' ? 'EN' : 'PT'}
+            </span>
+          </button>
         </nav>
 
         <button
@@ -56,6 +68,15 @@ const Header = () => {
               {item.label}
             </Link>
           ))}
+          <button
+            onClick={() => { toggleLocale(); setMobileOpen(false); }}
+            className="flex items-center gap-2 py-3 text-muted-foreground hover:text-primary transition-colors"
+          >
+            <Globe size={16} />
+            <span className="font-heading text-sm uppercase tracking-wider">
+              {locale === 'pt-BR' ? 'English' : 'Português'}
+            </span>
+          </button>
         </nav>
       )}
     </header>

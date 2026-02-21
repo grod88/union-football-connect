@@ -1,6 +1,9 @@
 import { motion } from "framer-motion";
+import { useLanguage } from "@/i18n";
 
 const VideoSection = () => {
+  const { t } = useLanguage();
+
   return (
     <section className="py-20 px-4 bg-secondary/30">
       <div className="container mx-auto max-w-4xl">
@@ -10,7 +13,7 @@ const VideoSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
         >
-          Conheça o Canal
+          {t.video.title}
         </motion.h2>
         <motion.p
           className="text-center text-muted-foreground mb-10 max-w-xl mx-auto"
@@ -19,7 +22,7 @@ const VideoSection = () => {
           viewport={{ once: true }}
           transition={{ delay: 0.2 }}
         >
-          Assista um pouco de como são nossas lives — emoção, zoeira e futebol de verdade!
+          {t.video.description}
         </motion.p>
 
         <motion.div
@@ -36,7 +39,6 @@ const VideoSection = () => {
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
-          {/* Fallback placeholder */}
           <div className="absolute inset-0 flex items-center justify-center bg-card">
             <div className="text-center">
               <div className="w-20 h-20 mx-auto mb-4 rounded-full gold-gradient flex items-center justify-center">
@@ -45,7 +47,7 @@ const VideoSection = () => {
                 </svg>
               </div>
               <p className="text-muted-foreground font-heading uppercase tracking-wider text-sm">
-                Vídeo de apresentação em breve
+                {t.video.placeholder}
               </p>
             </div>
           </div>
