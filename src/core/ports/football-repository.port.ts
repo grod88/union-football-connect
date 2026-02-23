@@ -20,6 +20,7 @@ export interface IFootballRepository {
   getFixturesByTeam(teamId: number, options?: { next?: number; last?: number; leagueId?: number; season?: number }): Promise<Fixture[]>;
   getFixturesByLeague(leagueId: number, season: number): Promise<Fixture[]>;
   getLiveFixtures(): Promise<Fixture[]>;
+  getFixturesByDate(date: string): Promise<Fixture[]>;
 
   // Fixture details
   getFixtureStatistics(fixtureId: number): Promise<FixtureStatistics | null>;

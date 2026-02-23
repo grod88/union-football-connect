@@ -1,81 +1,85 @@
 /**
  * Calendar Page (/calendario)
- * Shows upcoming fixtures grouped by date with league filter
+ * Shows upcoming fixtures for D+1, D+2, D+3 grouped by league
+ * with inline pre-match details on expand
  */
-import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { CalendarDays, Clock } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CalendarDays, ChevronDown } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { LeagueFilterBar } from '@/presentation/components/match/LeagueFilterBar';
-import { TeamBadge } from '@/presentation/components/match/TeamBadge';
-import { useCalendarFixtures, filterUpcomingFixtures } from '@/application/hooks/useCalendarFixtures';
-import { useLeagueFilter } from '@/application/hooks/useLeagueFilter';
-import { isFixtureLive, isFixtureFinished } from '@/core/domain/entities/fixture';
+import { PreMatchDetailPanel } from '@/presentation/components/live/PreMatchDetailPanel';
+import { useCalendarFixtures } from '@/application/hooks/useCalendarFixtures';
 import { getMatchTimezones } from '@/application/services/timezone.service';
-import { CURRENT_SEASON } from '@/config/constants';
-import { ROUTES } from '@/config/routes';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { Fixture } from '@/core/domain/entities/fixture';
 
-const FixtureCard = ({ fixture }: { fixture: Fixture }) => {
-  const live = isFixtureLive(fixture);
-  const finished = isFixtureFinished(fixture);
+/** Build date labels for D+1, D+2, D+3 */
+const buildDayOptions = () => {
+  const today = new Date();
+  return [1, 2, 3].map((offset) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() + offset);
+    const dateStr = d.toISOString().split('T')[0];
+    const label = d.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' });
+    return { offset, dateStr, label };
+  });
+};
+
+const FixtureRow = ({
+  fixture,
+  isExpanded,
+  onToggle,
+}: {
+  fixture: Fixture;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) => {
   const timezones = getMatchTimezones(fixture.date);
 
-  const linkTo = live
-    ? `${ROUTES.LIVE}?fixture=${fixture.id}`
-    : !finished
-      ? `/pre-jogo/${fixture.id}`
-      : undefined;
-
-  const content = (
-    <div className={cn(
-      'card-surface rounded-xl p-4 transition-colors',
-      live && 'ring-1 ring-destructive/50',
-      linkTo && 'hover:bg-secondary/50 cursor-pointer'
-    )}>
-      {/* League + status */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5">
-          {fixture.league.logo && (
-            <img src={fixture.league.logo} alt="" className="w-4 h-4 object-contain" />
-          )}
-          <span className="text-xs text-muted-foreground">{fixture.league.name}</span>
-        </div>
-        {live && (
-          <span className="text-xs bg-destructive text-destructive-foreground px-2 py-0.5 rounded-full font-bold animate-pulse">
-            ● AO VIVO
-          </span>
-        )}
-      </div>
-
-      {/* Teams */}
-      <div className="flex items-center gap-3">
+  return (
+    <div className="card-surface rounded-xl overflow-hidden transition-colors">
+      <button
+        onClick={onToggle}
+        className="w-full p-4 flex items-center gap-3 hover:bg-secondary/50 transition-colors text-left"
+      >
+        {/* Home */}
         <div className="flex-1 flex items-center gap-2 justify-end">
-          <span className="text-sm truncate max-w-[100px] text-right">{fixture.homeTeam.shortName || fixture.homeTeam.name}</span>
+          <span className="text-sm truncate max-w-[100px] text-right">
+            {fixture.homeTeam.shortName || fixture.homeTeam.name}
+          </span>
           <img src={fixture.homeTeam.logo} alt="" className="w-6 h-6 object-contain shrink-0" />
         </div>
+
+        {/* Time */}
         <div className="text-center min-w-[50px]">
-          {live || finished ? (
-            <span className="font-heading text-lg">{fixture.goalsHome ?? 0} - {fixture.goalsAway ?? 0}</span>
-          ) : (
-            <span className="font-heading text-lg text-primary">
-              {timezones[0]?.time}
-            </span>
-          )}
+          <span className="font-heading text-lg text-primary">
+            {timezones[0]?.time}
+          </span>
         </div>
+
+        {/* Away */}
         <div className="flex-1 flex items-center gap-2">
           <img src={fixture.awayTeam.logo} alt="" className="w-6 h-6 object-contain shrink-0" />
-          <span className="text-sm truncate max-w-[100px]">{fixture.awayTeam.shortName || fixture.awayTeam.name}</span>
+          <span className="text-sm truncate max-w-[100px]">
+            {fixture.awayTeam.shortName || fixture.awayTeam.name}
+          </span>
         </div>
-      </div>
 
-      {/* Timezone row for upcoming */}
-      {!live && !finished && (
-        <div className="flex justify-center gap-2 mt-2">
+        {/* Chevron */}
+        <ChevronDown
+          size={16}
+          className={cn(
+            'text-muted-foreground shrink-0 transition-transform duration-200',
+            isExpanded && 'rotate-180'
+          )}
+        />
+      </button>
+
+      {/* Timezone hints */}
+      {!isExpanded && (
+        <div className="flex justify-center gap-2 pb-3 -mt-1">
           {timezones.slice(0, 2).map((tz) => (
             <span key={tz.label} className="text-[10px] text-muted-foreground">
               {tz.flag} {tz.time}
@@ -83,40 +87,42 @@ const FixtureCard = ({ fixture }: { fixture: Fixture }) => {
           ))}
         </div>
       )}
+
+      {/* Expanded pre-match details */}
+      <AnimatePresence>
+        {isExpanded && <PreMatchDetailPanel fixture={fixture} />}
+      </AnimatePresence>
     </div>
   );
-
-  if (linkTo) {
-    return <Link to={linkTo}>{content}</Link>;
-  }
-  return content;
 };
 
 const CalendarPage = () => {
-  const { selectedLeagueIds } = useLeagueFilter();
+  const dayOptions = useMemo(buildDayOptions, []);
+  const [selectedDay, setSelectedDay] = useState(1);
+  const [expandedFixtureId, setExpandedFixtureId] = useState<number | null>(null);
 
-  // Fetch fixtures for the first selected league (we fetch per league)
-  // For simplicity, fetch the primary league
-  const primaryLeagueId = selectedLeagueIds[0] || 475;
-  const { data: fixtures, isLoading } = useCalendarFixtures({
-    leagueId: primaryLeagueId,
-    season: CURRENT_SEASON,
-  });
+  const dateStr = dayOptions.find((d) => d.offset === selectedDay)!.dateStr;
+  const { data: fixtures, isLoading } = useCalendarFixtures(dateStr);
 
-  // Group upcoming fixtures by date
-  const groupedByDate = useMemo(() => {
+  // Group by league
+  const groupedByLeague = useMemo(() => {
     if (!fixtures) return {};
-    const upcoming = filterUpcomingFixtures(fixtures);
-    const groups: Record<string, Fixture[]> = {};
-    for (const f of upcoming) {
-      const dateKey = f.date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
-      if (!groups[dateKey]) groups[dateKey] = [];
-      groups[dateKey].push(f);
+    const groups: Record<string, { league: Fixture['league']; fixtures: Fixture[] }> = {};
+    for (const f of fixtures) {
+      const key = `${f.league.id}`;
+      if (!groups[key]) {
+        groups[key] = { league: f.league, fixtures: [] };
+      }
+      groups[key].fixtures.push(f);
     }
     return groups;
   }, [fixtures]);
 
-  const dateKeys = Object.keys(groupedByDate);
+  const leagueKeys = Object.keys(groupedByLeague);
+
+  const toggleFixture = (id: number) => {
+    setExpandedFixtureId((prev) => (prev === id ? null : id));
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -141,8 +147,26 @@ const CalendarPage = () => {
             </h1>
           </motion.div>
 
-          {/* League filter */}
-          <LeagueFilterBar className="mb-6" compact />
+          {/* D+1 / D+2 / D+3 filter */}
+          <div className="flex justify-center gap-2 mb-8">
+            {dayOptions.map((opt) => (
+              <button
+                key={opt.offset}
+                onClick={() => {
+                  setSelectedDay(opt.offset);
+                  setExpandedFixtureId(null);
+                }}
+                className={cn(
+                  'px-4 py-2 rounded-lg text-sm font-heading uppercase transition-colors capitalize',
+                  selectedDay === opt.offset
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
 
           {/* Loading */}
           {isLoading && (
@@ -154,26 +178,39 @@ const CalendarPage = () => {
           )}
 
           {/* Empty */}
-          {!isLoading && dateKeys.length === 0 && (
+          {!isLoading && leagueKeys.length === 0 && (
             <div className="card-surface rounded-xl p-12 text-center">
               <CalendarDays className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
-              <p className="text-muted-foreground text-lg">Nenhum jogo futuro encontrado</p>
+              <p className="text-muted-foreground text-lg">Nenhum jogo encontrado para este dia</p>
             </div>
           )}
 
-          {/* Grouped fixtures */}
-          {dateKeys.map((dateKey) => (
-            <div key={dateKey} className="mb-6">
-              <h2 className="font-heading text-sm uppercase tracking-wider text-muted-foreground mb-3 capitalize">
-                {dateKey}
-              </h2>
-              <div className="space-y-3">
-                {groupedByDate[dateKey].map((fixture) => (
-                  <FixtureCard key={fixture.id} fixture={fixture} />
-                ))}
+          {/* Grouped by league */}
+          {leagueKeys.map((key) => {
+            const group = groupedByLeague[key];
+            return (
+              <div key={key} className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  {group.league.logo && (
+                    <img src={group.league.logo} alt="" className="w-5 h-5 object-contain" />
+                  )}
+                  <h2 className="font-heading text-sm uppercase tracking-wider text-muted-foreground">
+                    {group.league.name}
+                  </h2>
+                </div>
+                <div className="space-y-3">
+                  {group.fixtures.map((fixture) => (
+                    <FixtureRow
+                      key={fixture.id}
+                      fixture={fixture}
+                      isExpanded={expandedFixtureId === fixture.id}
+                      onToggle={() => toggleFixture(fixture.id)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </main>
 

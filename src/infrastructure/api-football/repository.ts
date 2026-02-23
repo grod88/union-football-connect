@@ -107,6 +107,16 @@ export class ApiFootballRepository implements IFootballRepository {
     }
   }
 
+  async getFixturesByDate(date: string): Promise<Fixture[]> {
+    try {
+      const response = await apiFootballClient.get<FixtureDTO[]>(`/fixtures?date=${date}`);
+      return mapFixturesFromDTO(response.response);
+    } catch (error) {
+      console.error(`Error fetching fixtures for date ${date}:`, error);
+      throw error;
+    }
+  }
+
   // ==================== Statistics ====================
 
   async getFixtureStatistics(fixtureId: number): Promise<FixtureStatistics | null> {
