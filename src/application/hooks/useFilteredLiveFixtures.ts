@@ -22,7 +22,7 @@ export function useFilteredLiveFixtures() {
   const { leagues, isLoading: leaguesLoading } = useMonitoredLeagues();
 
   // Which priorities are visible — default P1 + P2
-  const [visiblePriorities, setVisiblePriorities] = useState<number[]>([1, 2]);
+  const [visiblePriorities, setVisiblePriorities] = useState<number[]>([1, 2, 3]);
 
   const visibleLeagueIds = useMemo(
     () => leagues.filter(l => visiblePriorities.includes(l.priority ?? 3)).map(l => l.id),

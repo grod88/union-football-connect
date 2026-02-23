@@ -38,7 +38,7 @@ const LiveDashboard = () => {
     totalLiveCount,
     hiddenCount,
     visiblePriorities,
-    togglePriority,
+    setVisiblePriorities,
     showAll,
     isLoading,
   } = useFilteredLiveFixtures();
@@ -94,7 +94,7 @@ const LiveDashboard = () => {
           {totalLiveCount > 0 && (
             <PriorityFilterBar
               visiblePriorities={visiblePriorities}
-              togglePriority={togglePriority}
+              onSetPriorities={setVisiblePriorities}
               showAll={showAll}
               filteredCount={filteredCount}
               totalLiveCount={totalLiveCount}
