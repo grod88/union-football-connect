@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CalendarDays, Loader2, AlertCircle } from 'lucide-react';
+import { CalendarDays, Loader2, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -47,7 +47,29 @@ const TodayMatches = () => {
     return groupedFixtures.filter(g => visibleLeagueIds.includes(g.league.id));
   }, [groupedFixtures, leagues, visiblePriorities]);
 
-  const filteredCount = filteredGroups.reduce((sum, g) => sum + g.fixtures.length, 0);
+  // Split into upcoming (not started + live) and finished
+  const { upcomingGroups, finishedGroups } = useMemo(() => {
+    const upcoming: LeagueGroup[] = [];
+    const finished: LeagueGroup[] = [];
+
+    for (const group of filteredGroups) {
+      const upFixtures = group.fixtures.filter(f => !isFixtureFinished(f));
+      const finFixtures = group.fixtures.filter(f => isFixtureFinished(f));
+
+      if (upFixtures.length > 0) {
+        upcoming.push({ ...group, fixtures: upFixtures });
+      }
+      if (finFixtures.length > 0) {
+        finished.push({ ...group, fixtures: finFixtures });
+      }
+    }
+
+    return { upcomingGroups: upcoming, finishedGroups: finished };
+  }, [filteredGroups]);
+
+  const upcomingCount = upcomingGroups.reduce((s, g) => s + g.fixtures.length, 0);
+  const finishedCount = finishedGroups.reduce((s, g) => s + g.fixtures.length, 0);
+  const filteredCount = upcomingCount + finishedCount;
 
   // Deep link scroll
   useEffect(() => {
@@ -68,6 +90,53 @@ const TodayMatches = () => {
       return next;
     });
   }, []);
+
+  const renderFixtureList = (groups: LeagueGroup[], usePreMatch: boolean) =>
+    groups.map((group) => {
+      const leagueId = group.league.id;
+      const isCollapsed = collapsedLeagues.has(leagueId);
+
+      return (
+        <div key={leagueId} className="card-surface rounded-lg overflow-hidden">
+          <LeagueGroupHeader
+            league={group.league}
+            leagueInfo={group.leagueInfo}
+            fixtureCount={group.fixtures.length}
+            isCollapsed={isCollapsed}
+            onToggle={() => toggleLeague(leagueId)}
+          />
+
+          {!isCollapsed && (
+            <div>
+              {group.fixtures.map((fixture) => {
+                const isExpanded = expandedFixtureId === fixture.id;
+                const live = isFixtureLive(fixture);
+
+                return (
+                  <div
+                    key={fixture.id}
+                    ref={isExpanded && fixtureParam ? expandedRef : undefined}
+                  >
+                    <CompactFixtureRow
+                      fixture={fixture}
+                      isExpanded={isExpanded}
+                      onClick={() => handleFixtureClick(fixture.id)}
+                    />
+                    <AnimatePresence>
+                      {isExpanded && (
+                        usePreMatch && !live
+                          ? <PreMatchDetailPanel fixture={fixture} />
+                          : <ExpandedFixturePanel fixture={fixture} />
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    });
 
   return (
     <div className="min-h-screen bg-background">
@@ -128,55 +197,39 @@ const TodayMatches = () => {
             </div>
           )}
 
-          {/* League groups */}
-          {!isLoading && filteredGroups.length > 0 && (
-            <div className="space-y-3">
-              {filteredGroups.map((group) => {
-                const leagueId = group.league.id;
-                const isCollapsed = collapsedLeagues.has(leagueId);
+          {/* Upcoming / Live block */}
+          {!isLoading && upcomingGroups.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="h-4 w-4 text-primary" />
+                <h2 className="font-heading text-sm uppercase text-primary tracking-wide">
+                  Próximos Jogos
+                </h2>
+                <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded font-heading">
+                  {upcomingCount}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {renderFixtureList(upcomingGroups, true)}
+              </div>
+            </div>
+          )}
 
-                return (
-                  <div key={leagueId} className="card-surface rounded-lg overflow-hidden">
-                    <LeagueGroupHeader
-                      league={group.league}
-                      leagueInfo={group.leagueInfo}
-                      fixtureCount={group.fixtures.length}
-                      isCollapsed={isCollapsed}
-                      onToggle={() => toggleLeague(leagueId)}
-                    />
-
-                    {!isCollapsed && (
-                      <div>
-                        {group.fixtures.map((fixture) => {
-                          const isExpanded = expandedFixtureId === fixture.id;
-                          const live = isFixtureLive(fixture);
-                          const finished = isFixtureFinished(fixture);
-
-                          return (
-                            <div
-                              key={fixture.id}
-                              ref={isExpanded && fixtureParam ? expandedRef : undefined}
-                            >
-                              <CompactFixtureRow
-                                fixture={fixture}
-                                isExpanded={isExpanded}
-                                onClick={() => handleFixtureClick(fixture.id)}
-                              />
-                              <AnimatePresence>
-                                {isExpanded && (
-                                  (live || finished)
-                                    ? <ExpandedFixturePanel fixture={fixture} />
-                                    : <PreMatchDetailPanel fixture={fixture} />
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          {/* Finished block */}
+          {!isLoading && finishedGroups.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-heading text-sm uppercase text-muted-foreground tracking-wide">
+                  Encerrados
+                </h2>
+                <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded font-heading">
+                  {finishedCount}
+                </span>
+              </div>
+              <div className="space-y-3 opacity-90">
+                {renderFixtureList(finishedGroups, false)}
+              </div>
             </div>
           )}
         </div>
