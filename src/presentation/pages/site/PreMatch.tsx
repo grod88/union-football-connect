@@ -9,6 +9,7 @@ import { CalendarDays, ExternalLink, ChevronLeft, Trophy, Clock } from 'lucide-r
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { LoadingSpinner } from '@/presentation/components/common/LoadingSpinner';
+import { ErrorBoundary } from '@/presentation/components/common/ErrorBoundary';
 import { Scoreboard } from '@/presentation/components/match/Scoreboard';
 import { TeamBadge } from '@/presentation/components/match/TeamBadge';
 import { PredictionWidget } from '@/presentation/components/predictions/PredictionWidget';
@@ -215,35 +216,43 @@ const PreMatch = () => {
 
           {/* 3-column grid: Prediction, H2H, Standings */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mb-6">
-            <PredictionWidget
-              fixtureId={fixture.id}
-              homeTeam={fixture.homeTeam}
-              awayTeam={fixture.awayTeam}
-            />
-            <H2HCard
-              teamId1={fixture.homeTeam.id}
-              teamId2={fixture.awayTeam.id}
-              team1={fixture.homeTeam}
-              team2={fixture.awayTeam}
-              limit={10}
-            />
-            <StandingsTable
-              leagueId={fixture.league.id}
-              season={CURRENT_SEASON}
-              highlightTeamIds={[fixture.homeTeam.id, fixture.awayTeam.id]}
-              compact
-              maxRows={8}
-            />
+            <ErrorBoundary fallbackMessage="Predição indisponível">
+              <PredictionWidget
+                fixtureId={fixture.id}
+                homeTeam={fixture.homeTeam}
+                awayTeam={fixture.awayTeam}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary fallbackMessage="H2H indisponível">
+              <H2HCard
+                teamId1={fixture.homeTeam.id}
+                teamId2={fixture.awayTeam.id}
+                team1={fixture.homeTeam}
+                team2={fixture.awayTeam}
+                limit={10}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary fallbackMessage="Classificação indisponível">
+              <StandingsTable
+                leagueId={fixture.league.id}
+                season={CURRENT_SEASON}
+                highlightTeamIds={[fixture.homeTeam.id, fixture.awayTeam.id]}
+                compact
+                maxRows={8}
+              />
+            </ErrorBoundary>
           </div>
 
           {/* Injuries - full width */}
           <div className="mb-6">
-            <InjuriesPanel
-              fixtureId={fixture.id}
-              homeTeamId={fixture.homeTeam.id}
-              homeTeamName={fixture.homeTeam.name}
-              awayTeamName={fixture.awayTeam.name}
-            />
+            <ErrorBoundary fallbackMessage="Desfalques indisponíveis">
+              <InjuriesPanel
+                fixtureId={fixture.id}
+                homeTeamId={fixture.homeTeam.id}
+                homeTeamName={fixture.homeTeam.name}
+                awayTeamName={fixture.awayTeam.name}
+              />
+            </ErrorBoundary>
           </div>
         </div>
       </main>

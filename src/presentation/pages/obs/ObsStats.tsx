@@ -58,19 +58,26 @@ const ObsStats = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center p-4">
-        <LoadingSpinner size="lg" />
+      <div className="bg-transparent flex items-center justify-center p-4">
+        <div className="animate-pulse text-white/40 text-sm">Carregando...</div>
       </div>
     );
   }
 
   if (error || !statistics) {
     return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center p-4">
-        <ErrorMessage
-          message="Estatísticas não disponíveis"
-          onRetry={() => refetch()}
-        />
+      <div className="bg-transparent p-2">
+        <div
+          className="rounded-xl overflow-hidden p-6 text-center"
+          style={{
+            background: 'linear-gradient(135deg, rgba(30,25,22,0.95) 0%, rgba(20,18,16,0.98) 100%)',
+            border: '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          <p className="text-white/50 text-sm">
+            Estatísticas não disponíveis para esta competição
+          </p>
+        </div>
       </div>
     );
   }

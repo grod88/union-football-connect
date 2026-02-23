@@ -1,0 +1,12 @@
+{
+  "name": "Union Football Live",
+  "short_name": "Union FC",
+  "description": "O Futebol é Melhor Junto",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0A0A",
+  "theme_color": "#D4AF37",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }
+  ]
+}
