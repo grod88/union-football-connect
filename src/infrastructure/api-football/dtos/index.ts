@@ -3,3 +3,8 @@ export * from './statistics.dto';
 export * from './events.dto';
 export * from './lineups.dto';
 export * from './standings.dto';
+export * from './prediction.dto';
+export * from './injury.dto';
+export * from './player-fixture-stats.dto';
+export * from './top-scorer.dto';
+export * from './team-season-stats.dto';

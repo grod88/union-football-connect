@@ -3,3 +3,8 @@ export * from './statistics.mapper';
 export * from './events.mapper';
 export * from './lineups.mapper';
 export * from './standings.mapper';
+export * from './prediction.mapper';
+export * from './injury.mapper';
+export * from './player-fixture-stats.mapper';
+export * from './top-scorer.mapper';
+export * from './team-season-stats.mapper';

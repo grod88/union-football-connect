@@ -36,7 +36,24 @@ export const ENDPOINTS = {
 
   // Teams
   teamById: (id: number) => `/teams?id=${id}`,
+  teamStatistics: (teamId: number, leagueId: number, season: number) =>
+    `/teams/statistics?team=${teamId}&league=${leagueId}&season=${season}`,
 
   // Players
   playerById: (id: number) => `/players?id=${id}`,
+  topScorers: (leagueId: number, season: number) =>
+    `/players/topscorers?league=${leagueId}&season=${season}`,
+  topAssists: (leagueId: number, season: number) =>
+    `/players/topassists?league=${leagueId}&season=${season}`,
+
+  // Predictions
+  predictions: (fixtureId: number) => `/predictions?fixture=${fixtureId}`,
+
+  // Injuries
+  injuries: (fixtureId: number) => `/injuries?fixture=${fixtureId}`,
+  injuriesByLeague: (leagueId: number, season: number) =>
+    `/injuries?league=${leagueId}&season=${season}`,
+
+  // Leagues
+  leagues: (leagueId: number) => `/leagues?id=${leagueId}`,
 } as const;
