@@ -1,19 +1,25 @@
 /**
  * TodayMatches Page
- * Lists all today's matches from Campeonato Paulista with rich details
+ * Lists all today's matches with league grouping, status badges, and contextual links
  */
+import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Clock, MapPin, User, Trophy, Loader2, AlertCircle, CalendarDays } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useTodayFixtures } from '@/application/hooks/useTodayFixtures';
+import { useLeagueFilter } from '@/application/hooks/useLeagueFilter';
+import { LeagueFilterBar } from '@/presentation/components/match/LeagueFilterBar';
 import { useLanguage } from '@/i18n';
 import { TeamBadge } from '@/presentation/components/match/TeamBadge';
 import { getMatchTimezones } from '@/application/services/timezone.service';
 import { isFixtureLive, isFixtureFinished, getScoreDisplay, getElapsedDisplay } from '@/core/domain/entities/fixture';
 import type { Fixture } from '@/core/domain/entities/fixture';
+import { ROUTES } from '@/config/routes';
 import { format } from 'date-fns';
 import { ptBR, enUS } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 const MatchCard = ({ fixture, index }: { fixture: Fixture; index: number }) => {
   const { t, locale } = useLanguage();
@@ -22,36 +28,41 @@ const MatchCard = ({ fixture, index }: { fixture: Fixture; index: number }) => {
   const timezones = getMatchTimezones(fixture.date);
   const dateLocale = locale === 'pt-BR' ? ptBR : enUS;
 
-  return (
+  // Contextual link
+  const linkTo = live
+    ? `${ROUTES.LIVE}?fixture=${fixture.id}`
+    : !finished
+      ? `/pre-jogo/${fixture.id}`
+      : undefined;
+
+  const card = (
     <motion.div
-      className={`card-surface rounded-xl overflow-hidden ${live ? 'ring-2 ring-red-accent red-glow' : ''}`}
+      className={cn(
+        'card-surface rounded-xl overflow-hidden',
+        live && 'ring-2 ring-destructive/50',
+        linkTo && 'hover:bg-secondary/50 cursor-pointer transition-colors'
+      )}
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
+      transition={{ delay: index * 0.05 }}
     >
       {/* Header bar */}
       <div className="flex items-center justify-between px-4 py-2 bg-secondary/50 border-b border-border">
-        <div className="flex items-center gap-2">
-          {fixture.league.logo && (
-            <img src={fixture.league.logo} alt={fixture.league.name} className="h-5 w-5 object-contain" />
-          )}
-          <span className="text-xs text-muted-foreground font-heading uppercase tracking-wider">
-            {fixture.league.name}
-          </span>
-        </div>
         <div className="flex items-center gap-2">
           {fixture.league.round && (
             <span className="text-xs text-primary/80 font-heading uppercase tracking-wider">
               {fixture.league.round}
             </span>
           )}
+        </div>
+        <div className="flex items-center gap-2">
           {live && (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-accent text-foreground text-xs font-bold uppercase animate-pulse">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-destructive text-destructive-foreground text-xs font-bold uppercase animate-pulse">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-foreground opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-foreground" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive-foreground opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive-foreground" />
               </span>
-              {t.todayMatches.live}
+              {getElapsedDisplay(fixture) || t.todayMatches.live}
             </span>
           )}
           {finished && (
@@ -61,7 +72,7 @@ const MatchCard = ({ fixture, index }: { fixture: Fixture; index: number }) => {
           )}
           {!live && !finished && (
             <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-bold uppercase">
-              {t.todayMatches.notStarted}
+              {format(fixture.date, 'HH:mm', { locale: dateLocale })}
             </span>
           )}
         </div>
@@ -70,26 +81,16 @@ const MatchCard = ({ fixture, index }: { fixture: Fixture; index: number }) => {
       {/* Main content */}
       <div className="p-6">
         {/* Teams and score */}
-        <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center justify-between gap-4 mb-4">
           <div className="flex-1 flex flex-col items-center text-center">
             <TeamBadge team={fixture.homeTeam} size="md" namePosition="bottom" />
           </div>
 
           <div className="flex flex-col items-center gap-1 min-w-[80px]">
             {(live || finished) ? (
-              <>
-                <span className="font-heading text-4xl text-foreground">{getScoreDisplay(fixture)}</span>
-                {live && fixture.elapsed !== null && (
-                  <span className="text-red-accent text-sm font-bold">{getElapsedDisplay(fixture)}</span>
-                )}
-              </>
+              <span className="font-heading text-3xl text-foreground">{getScoreDisplay(fixture)}</span>
             ) : (
-              <div className="flex flex-col items-center">
-                <span className="font-heading text-2xl text-primary">
-                  {format(fixture.date, 'HH:mm', { locale: dateLocale })}
-                </span>
-                <span className="text-xs text-muted-foreground mt-1">{t.todayMatches.kickoff}</span>
-              </div>
+              <span className="font-heading text-xl text-muted-foreground">VS</span>
             )}
           </div>
 
@@ -99,15 +100,17 @@ const MatchCard = ({ fixture, index }: { fixture: Fixture; index: number }) => {
         </div>
 
         {/* Timezone bars */}
-        <div className="flex flex-wrap justify-center gap-2 mb-4">
-          {timezones.map((tz) => (
-            <div key={tz.label} className="flex items-center gap-1.5 bg-secondary/50 px-3 py-1.5 rounded-lg">
-              <Clock size={12} className="text-primary" />
-              <span className="text-xs text-muted-foreground">{tz.flag} {tz.label}</span>
-              <span className="text-xs font-semibold text-foreground">{tz.time}</span>
-            </div>
-          ))}
-        </div>
+        {!finished && (
+          <div className="flex flex-wrap justify-center gap-2 mb-3">
+            {timezones.map((tz) => (
+              <div key={tz.label} className="flex items-center gap-1.5 bg-secondary/50 px-3 py-1.5 rounded-lg">
+                <Clock size={12} className="text-primary" />
+                <span className="text-xs text-muted-foreground">{tz.flag} {tz.label}</span>
+                <span className="text-xs font-semibold text-foreground">{tz.time}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Details row */}
         <div className="flex flex-wrap justify-center gap-4 text-xs text-muted-foreground">
@@ -127,13 +130,37 @@ const MatchCard = ({ fixture, index }: { fixture: Fixture; index: number }) => {
       </div>
     </motion.div>
   );
+
+  if (linkTo) {
+    return <Link to={linkTo}>{card}</Link>;
+  }
+  return card;
 };
 
 const TodayMatches = () => {
   const { t, locale } = useLanguage();
   const { data: fixtures, isLoading, error } = useTodayFixtures();
+  const { selectedLeagueIds } = useLeagueFilter();
   const dateLocale = locale === 'pt-BR' ? ptBR : enUS;
   const todayFormatted = format(new Date(), "EEEE, d 'de' MMMM", { locale: dateLocale });
+
+  // Filter by selected leagues and group by league
+  const groupedFixtures = useMemo(() => {
+    if (!fixtures) return {};
+    const filtered = fixtures.filter(f => selectedLeagueIds.includes(f.league.id));
+    const groups: Record<string, { logo: string; fixtures: Fixture[] }> = {};
+    for (const f of filtered) {
+      const key = f.league.name;
+      if (!groups[key]) {
+        groups[key] = { logo: f.league.logo || '', fixtures: [] };
+      }
+      groups[key].fixtures.push(f);
+    }
+    return groups;
+  }, [fixtures, selectedLeagueIds]);
+
+  const leagueNames = Object.keys(groupedFixtures);
+  const totalFiltered = leagueNames.reduce((sum, k) => sum + groupedFixtures[k].fixtures.length, 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -142,7 +169,7 @@ const TodayMatches = () => {
         <div className="container mx-auto max-w-3xl">
           {/* Page header */}
           <motion.div
-            className="text-center mb-12"
+            className="text-center mb-8"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
@@ -158,6 +185,9 @@ const TodayMatches = () => {
             <p className="text-muted-foreground capitalize">{todayFormatted}</p>
           </motion.div>
 
+          {/* League filter */}
+          <LeagueFilterBar className="mb-6" />
+
           {/* States */}
           {isLoading && (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -168,12 +198,12 @@ const TodayMatches = () => {
 
           {error && (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <AlertCircle className="h-10 w-10 text-red-accent" />
+              <AlertCircle className="h-10 w-10 text-destructive" />
               <p className="text-muted-foreground">{t.todayMatches.error}</p>
             </div>
           )}
 
-          {!isLoading && !error && fixtures?.length === 0 && (
+          {!isLoading && !error && totalFiltered === 0 && (
             <motion.div
               className="card-surface rounded-xl p-12 text-center"
               initial={{ opacity: 0 }}
@@ -184,14 +214,27 @@ const TodayMatches = () => {
             </motion.div>
           )}
 
-          {/* Match list */}
-          {fixtures && fixtures.length > 0 && (
-            <div className="space-y-6">
-              {fixtures.map((fixture, i) => (
-                <MatchCard key={fixture.id} fixture={fixture} index={i} />
-              ))}
-            </div>
-          )}
+          {/* Match list grouped by league */}
+          {leagueNames.map((leagueName) => {
+            const group = groupedFixtures[leagueName];
+            return (
+              <div key={leagueName} className="mb-8">
+                <div className="flex items-center gap-2 mb-3">
+                  {group.logo && (
+                    <img src={group.logo} alt="" className="w-5 h-5 object-contain" />
+                  )}
+                  <h2 className="font-heading text-sm uppercase tracking-wider text-muted-foreground">
+                    {leagueName}
+                  </h2>
+                </div>
+                <div className="space-y-4">
+                  {group.fixtures.map((fixture, i) => (
+                    <MatchCard key={fixture.id} fixture={fixture} index={i} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </main>
       <Footer />
