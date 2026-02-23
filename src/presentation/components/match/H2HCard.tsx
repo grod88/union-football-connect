@@ -102,38 +102,42 @@ export const H2HCard = ({
             return (
               <div
                 key={match.id}
-                className="flex items-center gap-2 p-2 rounded-lg bg-secondary/30 text-sm"
+                className="flex items-center justify-between p-2 rounded-lg bg-secondary/30 text-xs"
               >
-                <span className="text-xs text-muted-foreground w-12 shrink-0">
+                <span className="text-muted-foreground w-10 shrink-0">
                   {formatShortDate(match.date)}
                 </span>
-                <div className="flex-1 flex items-center justify-end gap-1">
+                <div className="flex items-center gap-1">
                   <span className={cn(
-                    'text-xs truncate max-w-[80px]',
+                    'truncate max-w-[60px] text-right',
                     homeWon ? 'text-primary font-semibold' : 'text-muted-foreground'
                   )}>
                     {match.homeTeam.shortName || match.homeTeam.name}
                   </span>
-                  <img src={match.homeTeam.logo} alt="" className="w-4 h-4 object-contain" />
-                </div>
-                <span className={cn(
-                  'font-heading text-sm w-12 text-center',
-                  isDraw ? 'text-muted-foreground' : 'text-foreground'
-                )}>
-                  {homeGoals} - {awayGoals}
-                </span>
-                <div className="flex-1 flex items-center gap-1">
-                  <img src={match.awayTeam.logo} alt="" className="w-4 h-4 object-contain" />
+                  <img src={match.homeTeam.logo} alt="" className="w-4 h-4 object-contain shrink-0" />
                   <span className={cn(
-                    'text-xs truncate max-w-[80px]',
+                    'font-heading text-sm',
+                    homeWon ? 'text-primary' : isDraw ? 'text-muted-foreground' : 'text-foreground'
+                  )}>
+                    {homeGoals}
+                  </span>
+                </div>
+                <span className="text-muted-foreground">-</span>
+                <div className="flex items-center gap-1">
+                  <span className={cn(
+                    'font-heading text-sm',
+                    !isDraw && !homeWon ? 'text-primary' : isDraw ? 'text-muted-foreground' : 'text-foreground'
+                  )}>
+                    {awayGoals}
+                  </span>
+                  <img src={match.awayTeam.logo} alt="" className="w-4 h-4 object-contain shrink-0" />
+                  <span className={cn(
+                    'truncate max-w-[60px]',
                     !isDraw && !homeWon ? 'text-primary font-semibold' : 'text-muted-foreground'
                   )}>
                     {match.awayTeam.shortName || match.awayTeam.name}
                   </span>
                 </div>
-                <span className="text-xs text-muted-foreground italic truncate max-w-[60px] hidden sm:block">
-                  {match.league.name}
-                </span>
               </div>
             );
           })}
