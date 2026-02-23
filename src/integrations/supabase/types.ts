@@ -58,6 +58,7 @@ export type Database = {
       monitored_leagues: {
         Row: {
           country: string
+          country_flag: string | null
           coverage: Json | null
           created_at: string | null
           id: number
@@ -70,6 +71,7 @@ export type Database = {
         }
         Insert: {
           country: string
+          country_flag?: string | null
           coverage?: Json | null
           created_at?: string | null
           id: number
@@ -82,6 +84,7 @@ export type Database = {
         }
         Update: {
           country?: string
+          country_flag?: string | null
           coverage?: Json | null
           created_at?: string | null
           id?: number

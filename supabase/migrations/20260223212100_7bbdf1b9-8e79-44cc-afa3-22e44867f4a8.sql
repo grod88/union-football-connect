@@ -1,0 +1,1 @@
+ALTER TABLE monitored_leagues ADD COLUMN IF NOT EXISTS country_flag TEXT;
