@@ -35,8 +35,8 @@ export const ExpandedFixturePanel = ({ fixture }: ExpandedFixturePanelProps) => 
     toast.success('Link copiado!');
   };
 
-  const homeLineup = lineups?.[0];
-  const awayLineup = lineups?.[1];
+  const homeLineup = lineups?.home;
+  const awayLineup = lineups?.away;
 
   return (
     <motion.div
