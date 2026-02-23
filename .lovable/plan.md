@@ -1,55 +1,121 @@
 
 
-## Validar e Atualizar monitored_leagues
+## Redesign Completo da Pagina /ao-vivo
 
-### Situacao atual
+### Resumo
 
-A tabela `monitored_leagues` ja existe no banco com 10 ligas, mas precisa de ajustes:
+Reescrever `LiveDashboard.tsx` de um layout 2 colunas (detalhe + sidebar) para uma lista vertical unica agrupada por liga, estilo FotMob/SofaScore, com expansao inline ao clicar.
 
-1. **Coluna `country_flag` nao existe** -- a tabela nao tem esse campo. Sera adicionado via migration.
-2. **Prioridades incorretas**: Premier League esta como prioridade 2 (deveria ser 3), Serie B esta como prioridade 3 (deveria ser 2).
-3. **9 ligas faltando**: Europa League, Conference League, FIFA Club World Cup, Bundesliga, Ligue 1, Primeira Liga, Eredivisie, Copa Argentina, Copa de la Liga Argentina.
-4. **`is_active` incorreto**: Premier League, Serie B, La Liga, Serie A estao como `false` mas deveriam ser `true`.
+### Novos componentes a criar
 
-### Plano de execucao
+#### 1. `src/presentation/components/live/PriorityFilterBar.tsx`
+Barra de filtro com 3 botoes toggle + contador "Mostrando X de Y".
 
-#### 1. Migration SQL
+- Botoes: "Brasil + Libertadores" (P1), "Europa" (P2+P3), "Todos" (sem filtro)
+- Estilos: ativo = `bg-yellow-500/20 border-yellow-500 text-yellow-300`, inativo = `bg-secondary border-border text-muted-foreground`
+- Props: `visiblePriorities`, `togglePriority`, `filteredCount`, `totalLiveCount`, `hiddenCount`
 
-Adicionar coluna `country_flag` e ajustar dados:
+#### 2. `src/presentation/components/live/LeagueGroupHeader.tsx`
+Header de cada grupo de liga com flag, nome e chevron para colapsar.
+
+- Borda esquerda colorida por prioridade: P1 = `border-l-primary` (dourado), P2 = `border-l-blue-500`, P3 = `border-l-gray-600`
+- Clique toggle para mostrar/esconder os jogos daquela liga
+- Props: `league`, `leagueInfo`, `fixtureCount`, `isCollapsed`, `onToggle`
+
+#### 3. `src/presentation/components/live/CompactFixtureRow.tsx`
+Linha compacta para cada jogo (nao expandido).
+
+- Layout horizontal: `[minuto] [escudo 5x5] Home [placar] Away [escudo 5x5] [status]`
+- Status badge: `1o T` (vermelho), `INT` (amarelo), `FIM` (cinza), hora local (se NS)
+- Hover: `bg-white/5 cursor-pointer`
+- Click handler para expandir
+- Props: `fixture`, `isExpanded`, `onClick`
+
+#### 4. `src/presentation/components/live/ExpandedFixturePanel.tsx`
+Painel expandido inline (aparece abaixo da row ao clicar).
+
+- Header: escudos maiores (w-12 h-12) + placar grande (text-3xl) + minuto
+- 2 colunas (md) / 1 coluna (mobile): Estatisticas (reusar `StatComparison`) + Eventos (reusar `EventTimeline`)
+- Botao de link para copiar URL com `?fixture=ID`
+- Dados carregados sob demanda: `useFixture`, `useFixtureStatistics`, `useFixtureEvents` com `enabled: isExpanded`
+- Animacao: Framer Motion `AnimatePresence` com height/opacity transition
+- Props: `fixture` (dados basicos da lista), `onClose`
+
+#### 5. `src/presentation/components/live/OtherMatchesBanner.tsx`
+Banner no final: "+N jogos de outras ligas [Mostrar todos]"
+
+- Aparece quando `hiddenCount > 0`
+- Ao clicar, expande mostrando jogos nao monitorados agrupados por liga
+- Props: `hiddenCount`, `allFixtures`, `monitoredIds`
+
+#### 6. `src/presentation/components/live/EmptyLiveState.tsx`
+Estado vazio quando nao ha jogos nas ligas filtradas.
+
+- Icone + texto "Nenhum jogo ao vivo agora"
+- Proximo jogo monitorado usando `useNextMatch()`
+- Link para pre-jogo e calendario
+
+### Arquivo principal reescrito
+
+#### `src/presentation/pages/site/LiveDashboard.tsx`
+Reescrita completa:
+
+- Remove: layout `grid lg:grid-cols-3`, coluna lateral, `LiveMatchCard`, busca de fixture individual no nivel da pagina
+- Usa: `useFilteredLiveFixtures()` + `useLiveFixtures()` (para "outros jogos")
+- Estado local: `expandedFixtureId: number | null` (accordion - so 1 expandido)
+- Estado local: `collapsedLeagues: Set<number>` (ligas colapsadas)
+- Container: `max-w-4xl mx-auto px-4` (mais estreito e focado)
+- Deep link: se URL tem `?fixture=XXX`, auto-expandir e scroll ate o jogo
+- Estrutura JSX:
 
 ```text
-ALTER TABLE monitored_leagues ADD COLUMN IF NOT EXISTS country_flag TEXT;
+Header
+PriorityFilterBar
+  Para cada grupo em groupedFixtures:
+    LeagueGroupHeader
+      Para cada fixture no grupo:
+        CompactFixtureRow
+        (se expandido) ExpandedFixturePanel com AnimatePresence
+OtherMatchesBanner (se hiddenCount > 0)
+EmptyLiveState (se filteredCount === 0)
+Footer
 ```
 
-#### 2. Upsert de todas as 19 ligas
+### Barrel export
 
-Usando upsert (ON CONFLICT DO UPDATE) para corrigir as 10 existentes e inserir as 9 novas:
+#### `src/presentation/components/live/index.ts`
+Exportar todos os novos componentes.
 
-**Prioridade 1 (4 ligas)** -- sem mudanca, apenas adicionar flag:
-- 475 Paulistao, 71 Brasileirao A, 73 Copa do Brasil, 13 Libertadores
+### Detalhes tecnicos
 
-**Prioridade 2 (6 ligas)** -- corrigir Serie B (era 3), adicionar 3 novas:
-- 11 Sul-Americana, 72 Serie B, 2 Champions League, 3 Europa League, 848 Conference League, 15 FIFA Club World Cup
+| Aspecto | Implementacao |
+|---------|--------------|
+| Animacao expansao | `framer-motion` `AnimatePresence` + `motion.div` com `initial/animate/exit` em height e opacity |
+| Dados sob demanda | `useFixture(id, { enabled: isExpanded })` -- so busca quando expandido |
+| Accordion | Estado `expandedFixtureId` -- ao clicar outro jogo, fecha o anterior |
+| Deep link ?fixture=ID | `useEffect` com `useSearchParams` para auto-expandir + `scrollIntoView` |
+| Copiar link | `navigator.clipboard.writeText` com URL + `?fixture=ID` |
+| Responsividade mobile | Nomes truncados, escudos 4x4, stats/eventos em 1 coluna, `px-2` |
+| Reutilizacao | `StatComparison`, `EventTimeline`, `TeamBadge`, `MatchTimer` -- todos existentes |
 
-**Prioridade 3 (9 ligas)** -- corrigir Premier League (era 2), adicionar 5 novas:
-- 39 Premier League, 140 La Liga, 135 Serie A, 78 Bundesliga, 61 Ligue 1, 94 Primeira Liga, 88 Eredivisie, 128 Copa Argentina, 130 Copa de la Liga Argentina
+### Arquivos impactados
 
-Todas com `is_active = true`.
+| Arquivo | Acao |
+|---------|------|
+| `src/presentation/components/live/PriorityFilterBar.tsx` | Criar |
+| `src/presentation/components/live/LeagueGroupHeader.tsx` | Criar |
+| `src/presentation/components/live/CompactFixtureRow.tsx` | Criar |
+| `src/presentation/components/live/ExpandedFixturePanel.tsx` | Criar |
+| `src/presentation/components/live/OtherMatchesBanner.tsx` | Criar |
+| `src/presentation/components/live/EmptyLiveState.tsx` | Criar |
+| `src/presentation/components/live/index.ts` | Criar |
+| `src/presentation/pages/site/LiveDashboard.tsx` | Reescrever |
 
-#### 3. Atualizar types TypeScript
+### O que NAO muda
 
-A coluna `country_flag` sera refletida automaticamente no `types.ts` apos a migration. O tipo `monitored_leagues` ganhara o campo `country_flag: string | null`.
-
-#### 4. Verificacao
-
-Executar SELECT para confirmar 19 ligas com prioridades e flags corretas.
-
-### Resumo de mudancas
-
-| Acao | Detalhes |
-|------|----------|
-| Migration SQL | ADD COLUMN country_flag TEXT |
-| Data upsert | 19 ligas (4 P1, 6 P2, 9 P3) |
-| Correcoes | Premier League 2->3, Serie B 3->2, todos is_active=true |
-| Types | Atualizado automaticamente com country_flag |
+- Hooks existentes (`useFixture`, `useFixtureStatistics`, `useFixtureEvents`, `useLiveFixtures`, `useFilteredLiveFixtures`, `useMonitoredLeagues`, `useNextMatch`)
+- Componentes reutilizados (`StatComparison`, `EventTimeline`, `TeamBadge`, `MatchTimer`, `Scoreboard`)
+- Header e Footer globais
+- Rotas (`/ao-vivo` continua no mesmo path)
+- Funcionalidade: mesmas informacoes, apenas layout diferente
 
