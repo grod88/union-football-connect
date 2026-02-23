@@ -1,68 +1,70 @@
 
-## Refatorar Calendario: Apenas Jogos Futuros D+1, D+2, D+3
 
-### O que muda
+## Correcoes: Landing Page (Proximo Jogo + Classificacao) e Tela Ao Vivo
 
-A pagina `/calendario` deixa de mostrar jogos encerrados e ao vivo. Passa a funcionar como um calendario de proximos jogos com 3 filtros simples: **Amanha (D+1)**, **Em 2 dias (D+2)** e **Em 3 dias (D+3)**. D+1 e o filtro padrao ao carregar. Ao clicar em um jogo, expande inline com os detalhes de pre-jogo (odds/predicoes, H2H, desfalques, escalacao) usando o `PreMatchDetailPanel` ja existente.
+### Problema 1: Landing Page - Proximo Jogo busca apenas Paulistao
+
+O hook `useNextMatch` filtra por `leagueId = LEAGUES.PAULISTAO` por padrao, o que impede de encontrar jogos do Sao Paulo em outras competicoes (Brasileirao, Libertadores, etc.). A busca precisa ser sem filtro de liga para trazer o proximo jogo independente da competicao.
+
+### Problema 2: Landing Page - Classificacao fixa no Paulistao
+
+O componente `StandingsSummary` usa `LEAGUES.PAULISTAO` fixo. Deveria mostrar a classificacao da liga do proximo jogo (se o proximo jogo e pelo Brasileirao, mostra a tabela do Brasileirao).
+
+### Problema 3: Ao Vivo - "Mostrar todos os X jogos" nao funciona
+
+O botao chama `showAll()` que define priorities `[1, 2, 3]`, mas jogos de ligas nao monitoradas nao tem priority, entao continuam ocultos. A solucao e fazer o showAll incluir TODOS os jogos, nao apenas os de ligas monitoradas.
+
+### Problema 4: Ao Vivo - OtherMatchesBanner sem painel expandido
+
+O componente `OtherMatchesBanner` renderiza `CompactFixtureRow` mas nao renderiza o `ExpandedFixturePanel` quando um jogo e clicado, entao clicar neles nao mostra detalhes.
+
+---
 
 ### Detalhes Tecnicos
 
-#### Arquivo 1: `src/application/hooks/useCalendarFixtures.ts`
+#### Arquivo 1: `src/application/hooks/useNextMatch.ts`
 
-Reescrever o hook para buscar fixtures por data especifica em vez de por liga/season inteira.
-
-- Novo parametro: `date: string` (formato YYYY-MM-DD)
-- Endpoint: `/fixtures?date=YYYY-MM-DD` (sem filtro de liga — traz todas as ligas naquele dia)
-- Filtrar client-side apenas fixtures com status `NS` ou `TBD` (nao iniciados)
-- Remover as funcoes `filterUpcomingFixtures`, `filterLiveFixtures`, `filterFinishedFixtures` (nao serao mais usadas aqui)
+Remover o filtro de `leagueId` e `season` da chamada padrao, para buscar o proximo jogo do Sao Paulo em QUALQUER liga:
 
 ```text
-queryKey: ['calendar-fixtures', date]
-queryFn: GET /fixtures?date={date}
-Pos-processamento: filtrar apenas status NS/TBD, ordenar por timestamp
+ANTES: getFixturesByTeam(teamId, { next: 1, leagueId, season })
+DEPOIS: getFixturesByTeam(teamId, { next: 1 })
 ```
 
-#### Arquivo 2: `src/presentation/pages/site/Calendar.tsx`
+Isso faz a API retornar o proximo jogo independente da competicao.
 
-Reescrever a pagina com:
+#### Arquivo 2: `src/pages/Index.tsx`
 
-1. **State `selectedDay`**: 1, 2 ou 3 (default: 1) representando D+1, D+2, D+3
-2. **Filtro de 3 botoes**: Calcular a data real (amanha, depois de amanha, daqui 3 dias) e exibir como label no botao (ex: "Seg, 24 fev", "Ter, 25 fev", "Qua, 26 fev")
-3. **Remover**: `LeagueFilterBar`, imports de `isFixtureLive`/`isFixtureFinished`, logica de jogos encerrados/ao vivo
-4. **Agrupar por liga**: Em vez de agrupar por data (ja que e so 1 dia), agrupar os jogos por liga (league.name)
-5. **Accordion com pre-jogo**: State `expandedFixtureId`, ao clicar expande o `PreMatchDetailPanel` com predicoes, H2H, desfalques, escalacao
-6. **FixtureCard simplificado**: So mostra horario (nunca placar), sempre linka para expandir inline
+Atualizar `StandingsSummary` para usar a liga do proximo jogo dinamicamente:
+
+- Importar `useNextMatch`
+- Buscar o proximo jogo e extrair `fixture.league.id` e `fixture.league.season`
+- Passar esses valores para `StandingsTable` em vez dos hardcoded `LEAGUES.PAULISTAO` e `CURRENT_SEASON`
+- Determinar a season correta baseado na liga (ligas europeias usam season - 1)
+
+#### Arquivo 3: `src/application/hooks/useFilteredLiveFixtures.ts`
+
+Atualizar `showAll` para incluir jogos de ligas NAO monitoradas tambem. Adicionar um state `showAllMatches` que, quando ativo, bypassa o filtro de `visibleLeagueIds`:
 
 ```text
-Layout:
-  [D+1 ativo] [D+2] [D+3]      <-- 3 botoes com data formatada
-
-  Premier League
-    Santos vs Palmeiras    18:00
-    [expand: PreMatchDetailPanel]
-
-  La Liga
-    Barcelona vs Real Madrid  16:00
-
-  Sem jogos? -> Estado vazio
+ANTES: showAll: () => setVisiblePriorities([1, 2, 3])
+DEPOIS: showAll inclui flag que mostra TODOS os jogos, inclusive nao monitorados
 ```
 
-#### Calculo das datas
+#### Arquivo 4: `src/presentation/pages/site/LiveDashboard.tsx`
 
-```text
-const today = new Date()
-const targetDate = new Date(today)
-targetDate.setDate(today.getDate() + selectedDay)
-const dateStr = targetDate.toISOString().split('T')[0]
-```
+Quando `showAll` estiver ativo, os jogos "outros" devem aparecer inline na lista principal em vez de no banner separado.
 
-#### Dados buscados
+#### Arquivo 5: `src/presentation/components/live/OtherMatchesBanner.tsx`
 
-O endpoint `/fixtures?date=YYYY-MM-DD` retorna jogos de TODAS as ligas naquele dia. Nao precisamos filtrar por liga — mostramos tudo agrupado por liga.
+Adicionar `ExpandedFixturePanel` apos cada `CompactFixtureRow` para que clicar num jogo expanda os detalhes, igual ao comportamento da lista principal.
 
 ### Arquivos impactados
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/application/hooks/useCalendarFixtures.ts` | Reescrever para buscar por data (`/fixtures?date=X`), filtrar apenas NS/TBD |
-| `src/presentation/pages/site/Calendar.tsx` | Novo layout com filtro D+1/D+2/D+3, accordion com PreMatchDetailPanel, agrupar por liga |
+| `src/application/hooks/useNextMatch.ts` | Remover filtro de leagueId para buscar proximo jogo em qualquer liga |
+| `src/pages/Index.tsx` | StandingsSummary dinamico baseado na liga do proximo jogo |
+| `src/application/hooks/useFilteredLiveFixtures.ts` | showAll inclui jogos de ligas nao monitoradas |
+| `src/presentation/pages/site/LiveDashboard.tsx` | Integrar showAll com lista completa |
+| `src/presentation/components/live/OtherMatchesBanner.tsx` | Adicionar ExpandedFixturePanel nos jogos expandidos |
