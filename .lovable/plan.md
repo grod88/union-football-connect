@@ -1,72 +1,71 @@
 
 
-## Ajustar Filtros da Pagina /classificacao com Ligas Europeias
+## Corrigir Filtros e Dados da Pagina /classificacao
 
-### O que muda
+### Problema 1: Filtros em scroll horizontal
 
-A lista de ligas no seletor sera expandida de 6 para ~11 opcoes, removendo Copa do Brasil e Sul-Americana (que nao tem formato de classificacao tradicional) e adicionando as principais ligas europeias. Tambem vamos adicionar os IDs faltantes no `LEAGUES` constant.
+O container dos filtros usa `overflow-x-auto` que cria uma barra de scroll. Vamos trocar por `flex-wrap` para que os botoes quebrem linha naturalmente sem scroll.
 
-### Novas ligas no seletor
+### Problema 2: Ligas europeias sem dados
 
-1. Paulistao (475) - manter
-2. Brasileirao Serie A (71) - manter
-3. Brasileirao Serie B (72) - manter
-4. Libertadores (13) - manter
-5. Champions League (2) - NOVO
-6. Premier League (39) - NOVO
-7. La Liga (140) - NOVO
-8. Serie A Italia (135) - NOVO
-9. Bundesliga (78) - NOVO
-10. Ligue 1 (61) - NOVO
-11. Primeira Liga Portugal (94) - NOVO
+As ligas europeias retornam `results: 0` porque o sistema usa `CURRENT_SEASON = 2026` para todas. Porem, ligas europeias seguem calendario agosto-maio, entao a temporada atual na API-Football e `2025` (temporada 2025/26). Ligas brasileiras usam ano calendario, entao `2026` esta correto.
+
+Evidencia nos network requests: todas as chamadas `/standings?league=39&season=2026`, `/standings?league=2&season=2026`, etc. retornam `"results": 0`.
+
+### Solucao
+
+#### Arquivo 1: `src/presentation/pages/site/Standings.tsx`
+
+1. Trocar `overflow-x-auto` por `flex-wrap` no container dos filtros
+2. Adicionar a season correta por liga no array `leagueGroups` (campo `season` em cada liga)
+3. Passar o `season` correto para `StandingsTable` e `TopScorersTable`
+
+Cada liga no array tera um campo `season`:
+- Ligas brasileiras: `CURRENT_SEASON` (2026)
+- Ligas europeias e Champions/Libertadores: `CURRENT_SEASON - 1` (2025)
+
+O state `selectedLeagueId` sera expandido para incluir o season correspondente, ou criaremos um lookup simples.
+
+#### Arquivo 2: Nenhum outro arquivo precisa mudar
+
+O `useStandings`, `StandingsTable` e `TopScorersTable` ja recebem `season` como prop -- so precisamos passar o valor correto.
 
 ### Detalhes Tecnicos
 
-#### Arquivo 1: `src/config/constants.ts`
+```text
+leagueGroups com season:
 
-Adicionar os IDs das ligas europeias ao objeto `LEAGUES`:
+Brasil (season = 2026):
+  Paulistao (475), Brasileirao A (71), Serie B (72)
 
+Continental (season = 2025):
+  Libertadores (13), Champions (2)
+
+Europa (season = 2025):
+  Premier League (39), La Liga (140), Serie A (135),
+  Bundesliga (78), Ligue 1 (61), Primeira Liga (94)
 ```
-CHAMPIONS_LEAGUE: 2,
-PREMIER_LEAGUE: 39,
-LA_LIGA: 140,
-SERIE_A_ITALY: 135,
-BUNDESLIGA: 78,
-LIGUE_1: 61,
-PRIMEIRA_LIGA: 94,
-```
 
-#### Arquivo 2: `src/presentation/pages/site/Standings.tsx`
-
-Atualizar o array `leagueOptions` para incluir as 11 ligas, organizadas por grupo (Brasil, Continental, Europa). Remover Copa do Brasil e Sul-Americana. O layout dos chips de filtro permanece o mesmo (scroll horizontal), so muda a lista.
-
-Novo array:
+No componente, ao selecionar uma liga, guardaremos tanto o `leagueId` quanto o `season`:
 
 ```text
-Brasil:
-  - Paulistao (475) 🏆
-  - Brasileirao A (71) 🇧🇷
-  - Serie B (72) 🇧🇷
+const selectedLeague = allLeagues.find(l => l.id === selectedLeagueId)
+const season = selectedLeague?.season ?? CURRENT_SEASON
 
-Continental:
-  - Libertadores (13) 🌎
-
-Europa:
-  - Champions League (2) 🇪🇺
-  - Premier League (39) 🏴
-  - La Liga (140) 🇪🇸
-  - Serie A (135) 🇮🇹
-  - Bundesliga (78) 🇩🇪
-  - Ligue 1 (61) 🇫🇷
-  - Primeira Liga (94) 🇵🇹
+<StandingsTable leagueId={selectedLeagueId} season={season} />
+<TopScorersTable leagueId={selectedLeagueId} season={season} />
 ```
 
-Como sao ~11 filtros, adicionar separadores visuais leves (um `|` ou gap maior) entre os grupos Brasil / Continental / Europa para facilitar a leitura na barra horizontal.
+Layout dos filtros:
+
+```text
+ANTES:  flex overflow-x-auto  (scroll horizontal)
+DEPOIS: flex flex-wrap gap-2   (quebra linha, sem scroll)
+```
 
 ### Arquivos impactados
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/config/constants.ts` | Adicionar IDs das 7 ligas europeias ao LEAGUES |
-| `src/presentation/pages/site/Standings.tsx` | Atualizar leagueOptions com 11 ligas agrupadas |
+| `src/presentation/pages/site/Standings.tsx` | Trocar scroll por flex-wrap; adicionar season por liga; passar season correto aos componentes |
 
