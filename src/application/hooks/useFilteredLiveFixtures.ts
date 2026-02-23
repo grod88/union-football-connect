@@ -23,6 +23,7 @@ export function useFilteredLiveFixtures() {
 
   // Which priorities are visible — default P1 + P2
   const [visiblePriorities, setVisiblePriorities] = useState<number[]>([1, 2, 3]);
+  const [showAllMatches, setShowAllMatches] = useState(false);
 
   const visibleLeagueIds = useMemo(
     () => leagues.filter(l => visiblePriorities.includes(l.priority ?? 3)).map(l => l.id),
@@ -30,8 +31,10 @@ export function useFilteredLiveFixtures() {
   );
 
   const filteredFixtures = useMemo(
-    () => (allLiveFixtures ?? []).filter(f => visibleLeagueIds.includes(f.league.id)),
-    [allLiveFixtures, visibleLeagueIds],
+    () => showAllMatches
+      ? (allLiveFixtures ?? [])
+      : (allLiveFixtures ?? []).filter(f => visibleLeagueIds.includes(f.league.id)),
+    [allLiveFixtures, visibleLeagueIds, showAllMatches],
   );
 
   const groupedFixtures = useMemo(() => {
@@ -66,8 +69,10 @@ export function useFilteredLiveFixtures() {
       setVisiblePriorities(prev =>
         prev.includes(priority) ? prev.filter(p => p !== priority) : [...prev, priority],
       ),
-    showAll: () => setVisiblePriorities([1, 2, 3]),
-    showImportant: () => setVisiblePriorities([1, 2]),
+    showAll: () => { setShowAllMatches(true); setVisiblePriorities([1, 2, 3]); },
+    showImportant: () => { setShowAllMatches(false); setVisiblePriorities([1, 2]); },
+    showAllMatches,
+    setShowAllMatches,
     isLoading: fixturesLoading || leaguesLoading,
   };
 }

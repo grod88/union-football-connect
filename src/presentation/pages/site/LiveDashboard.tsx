@@ -40,6 +40,7 @@ const LiveDashboard = () => {
     visiblePriorities,
     setVisiblePriorities,
     showAll,
+    showAllMatches,
     isLoading,
   } = useFilteredLiveFixtures();
 
@@ -175,8 +176,8 @@ const LiveDashboard = () => {
             </div>
           )}
 
-          {/* Other matches banner */}
-          {!isLoading && hiddenCount > 0 && (
+          {/* Other matches banner — hidden when showAll is active */}
+          {!isLoading && hiddenCount > 0 && !showAllMatches && (
             <OtherMatchesBanner
               hiddenCount={hiddenCount}
               allFixtures={allLiveFixtures ?? []}
