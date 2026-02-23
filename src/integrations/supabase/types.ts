@@ -55,6 +55,66 @@ export type Database = {
           },
         ]
       }
+      monitored_leagues: {
+        Row: {
+          country: string
+          coverage: Json | null
+          created_at: string | null
+          id: number
+          is_active: boolean | null
+          logo: string | null
+          name: string
+          priority: number | null
+          season: number
+          updated_at: string | null
+        }
+        Insert: {
+          country: string
+          coverage?: Json | null
+          created_at?: string | null
+          id: number
+          is_active?: boolean | null
+          logo?: string | null
+          name: string
+          priority?: number | null
+          season: number
+          updated_at?: string | null
+        }
+        Update: {
+          country?: string
+          coverage?: Json | null
+          created_at?: string | null
+          id?: number
+          is_active?: boolean | null
+          logo?: string | null
+          name?: string
+          priority?: number | null
+          season?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      standings_cache: {
+        Row: {
+          data: Json
+          fetched_at: string | null
+          league_id: number
+          season: number
+        }
+        Insert: {
+          data: Json
+          fetched_at?: string | null
+          league_id: number
+          season: number
+        }
+        Update: {
+          data?: Json
+          fetched_at?: string | null
+          league_id?: number
+          season?: number
+        }
+        Relationships: []
+      }
       teams: {
         Row: {
           country: string
@@ -82,12 +142,66 @@ export type Database = {
         }
         Relationships: []
       }
+      top_scorers_cache: {
+        Row: {
+          data: Json
+          fetched_at: string | null
+          league_id: number
+          season: number
+          type: string
+        }
+        Insert: {
+          data: Json
+          fetched_at?: string | null
+          league_id: number
+          season: number
+          type?: string
+        }
+        Update: {
+          data?: Json
+          fetched_at?: string | null
+          league_id?: number
+          season?: number
+          type?: string
+        }
+        Relationships: []
+      }
+      upcoming_fixtures_cache: {
+        Row: {
+          away_team_id: number | null
+          data: Json
+          fetched_at: string | null
+          fixture_id: number
+          home_team_id: number | null
+          league_id: number
+          match_date: string
+        }
+        Insert: {
+          away_team_id?: number | null
+          data: Json
+          fetched_at?: string | null
+          fixture_id: number
+          home_team_id?: number | null
+          league_id: number
+          match_date: string
+        }
+        Update: {
+          away_team_id?: number | null
+          data?: Json
+          fetched_at?: string | null
+          fixture_id?: number
+          home_team_id?: number | null
+          league_id?: number
+          match_date?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      clean_old_fixtures: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
