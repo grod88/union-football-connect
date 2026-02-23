@@ -15,6 +15,9 @@ import { ObsScoreboard, ObsStats, ObsEvents, ObsPoll, ObsLeagueName, ObsHomeTeam
 // Site Pages
 import { LiveDashboard, JoinUs } from "@/presentation/pages/site";
 import TodayMatches from "@/presentation/pages/site/TodayMatches";
+import PreMatch from "@/presentation/pages/site/PreMatch";
+import StandingsPage from "@/presentation/pages/site/Standings";
+import CalendarPage from "@/presentation/pages/site/Calendar";
 
 // Route configuration
 import { ROUTES, isOBSRoute } from "@/config/routes";
@@ -57,6 +60,9 @@ const App = () => (
             <Route path={ROUTES.HOME} element={<Index />} />
             <Route path={ROUTES.LIVE} element={<LiveDashboard />} />
             <Route path={ROUTES.TODAY_MATCHES} element={<TodayMatches />} />
+            <Route path={ROUTES.PRE_MATCH} element={<PreMatch />} />
+            <Route path={ROUTES.STANDINGS} element={<StandingsPage />} />
+            <Route path={ROUTES.CALENDAR} element={<CalendarPage />} />
             <Route path={ROUTES.JOIN_US} element={<JoinUs />} />
             <Route path={ROUTES.COMMUNITY} element={<Navigate to={ROUTES.JOIN_US} replace />} />
 

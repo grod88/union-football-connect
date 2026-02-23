@@ -2,22 +2,26 @@
  * Live Dashboard Page (/ao-vivo)
  * Shows live fixtures with real-time updates, stats, and events
  */
-import { useSearchParams } from 'react-router-dom';
-import { Radio, BarChart3, Clock, RefreshCw } from 'lucide-react';
+import { useSearchParams, Link } from 'react-router-dom';
+import { Radio, BarChart3, Clock, RefreshCw, ChevronRight } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { LoadingSpinner } from '@/presentation/components/common/LoadingSpinner';
-import { ErrorMessage } from '@/presentation/components/common/ErrorMessage';
 import { LiveBadge } from '@/presentation/components/common/LiveBadge';
 import { Scoreboard } from '@/presentation/components/match/Scoreboard';
 import { StatComparison } from '@/presentation/components/statistics/StatComparison';
 import { EventTimeline } from '@/presentation/components/events/EventTimeline';
 import { LiveMatchCard } from '@/presentation/components/match/LiveMatchCard';
+import { PlayerRatings } from '@/presentation/components/players/PlayerRatings';
+import { TeamBadge } from '@/presentation/components/match/TeamBadge';
 import { useFixture } from '@/application/hooks/useFixture';
 import { useFixtureStatistics } from '@/application/hooks/useFixtureStatistics';
 import { useFixtureEvents } from '@/application/hooks/useFixtureEvents';
 import { useLiveFixtures } from '@/application/hooks/useLiveFixtures';
+import { useNextMatch } from '@/application/hooks/useNextMatch';
 import { isFixtureLive } from '@/core/domain/entities/fixture';
+import { getMatchTimezones } from '@/application/services/timezone.service';
+import { ROUTES } from '@/config/routes';
 
 const LiveDashboard = () => {
   const [searchParams] = useSearchParams();
@@ -31,18 +35,24 @@ const LiveDashboard = () => {
     refetch: refetchLive,
   } = useLiveFixtures();
 
+  // Auto-detect: if no fixture param, use first live fixture
+  const autoFixtureId = !fixtureId && liveFixtures?.length ? liveFixtures[0].id : fixtureId;
+
   // Fetch selected fixture details
   const {
     data: selectedFixture,
     isLoading: isLoadingFixture,
-  } = useFixture(fixtureId, { autoRefreshWhenLive: true });
+  } = useFixture(autoFixtureId, { autoRefreshWhenLive: true });
 
   // Fetch stats and events for selected fixture
-  const { data: statistics } = useFixtureStatistics(fixtureId);
-  const { data: events } = useFixtureEvents(fixtureId);
+  const { data: statistics } = useFixtureStatistics(autoFixtureId);
+  const { data: events } = useFixtureEvents(autoFixtureId);
 
-  // If no fixture selected, show the first live one (if any)
-  const displayFixture = selectedFixture || (liveFixtures && liveFixtures[0]);
+  // Next match (for when no live games)
+  const { data: nextMatch } = useNextMatch();
+
+  const displayFixture = selectedFixture;
+  const isLive = displayFixture ? isFixtureLive(displayFixture) : false;
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,13 +71,25 @@ const LiveDashboard = () => {
                 <LiveBadge size="sm" />
               )}
             </div>
-            <button
-              onClick={() => refetchLive()}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
-            >
-              <RefreshCw size={16} />
-              Atualizar
-            </button>
+            <div className="flex items-center gap-3">
+              {/* Pre-match link */}
+              {displayFixture && (
+                <Link
+                  to={`/pre-jogo/${displayFixture.id}`}
+                  className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  📊 Pré-Jogo
+                  <ChevronRight size={12} />
+                </Link>
+              )}
+              <button
+                onClick={() => refetchLive()}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <RefreshCw size={16} />
+                Atualizar
+              </button>
+            </div>
           </div>
 
           {/* Main content grid */}
@@ -81,16 +103,49 @@ const LiveDashboard = () => {
                 </div>
               )}
 
-              {/* No live matches */}
+              {/* No live matches & no fixture selected */}
               {!isLoadingLive && (!liveFixtures || liveFixtures.length === 0) && !fixtureId && (
                 <div className="card-surface rounded-xl p-12 text-center">
                   <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h2 className="font-heading text-xl mb-2">
+                  <h2 className="font-heading text-xl mb-4">
                     Nenhum jogo ao vivo no momento
                   </h2>
-                  <p className="text-muted-foreground text-sm">
-                    Quando houver jogos ao vivo, eles aparecerão aqui com atualizações em tempo real.
-                  </p>
+
+                  {/* Next match */}
+                  {nextMatch && (
+                    <div className="mt-6 p-4 bg-secondary/30 rounded-xl inline-block">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Próximo jogo</p>
+                      <div className="flex items-center gap-4 mb-3">
+                        <TeamBadge team={nextMatch.homeTeam} size="sm" />
+                        <span className="text-muted-foreground font-heading">VS</span>
+                        <TeamBadge team={nextMatch.awayTeam} size="sm" />
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {nextMatch.league.name}
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-2 mb-3">
+                        {getMatchTimezones(nextMatch.date).slice(0, 2).map((tz) => (
+                          <span key={tz.label} className="text-xs text-muted-foreground">
+                            {tz.flag} {tz.time}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 justify-center">
+                        <Link
+                          to={`/pre-jogo/${nextMatch.id}`}
+                          className="text-xs bg-primary/20 text-primary px-3 py-1.5 rounded-lg hover:bg-primary/30 transition-colors"
+                        >
+                          Ver Pré-Jogo
+                        </Link>
+                        <Link
+                          to={ROUTES.CALENDAR}
+                          className="text-xs border border-border text-muted-foreground px-3 py-1.5 rounded-lg hover:border-primary/50 transition-colors"
+                        >
+                          Calendário
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -143,6 +198,17 @@ const LiveDashboard = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* Player Ratings - only when live */}
+                  {isLive && (
+                    <PlayerRatings
+                      fixtureId={displayFixture.id}
+                      homeTeamId={displayFixture.homeTeam.id}
+                      homeTeamName={displayFixture.homeTeam.name}
+                      awayTeamName={displayFixture.awayTeam.name}
+                      enabled={isLive}
+                    />
+                  )}
                 </>
               )}
             </div>

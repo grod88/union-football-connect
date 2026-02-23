@@ -12,6 +12,8 @@ const Header = () => {
     { label: t.nav.home, href: "/" },
     { label: t.nav.live, href: "/ao-vivo" },
     { label: t.nav.todayMatches, href: "/jogos-do-dia" },
+    { label: 'Classificação', href: "/classificacao" },
+    { label: 'Calendário', href: "/calendario" },
     { label: t.nav.joinUs, href: "/junte-se" },
   ];
 
