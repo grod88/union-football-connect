@@ -5,6 +5,11 @@ const ALLOWED_ENDPOINT_PREFIXES = [
   "/standings",
   "/teams",
   "/players",
+  "/predictions",
+  "/injuries",
+  "/coachs",
+  "/venues",
+  "/leagues",
 ];
 
 function isOriginAllowed(origin: string): boolean {
