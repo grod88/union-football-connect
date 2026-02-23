@@ -5,3 +5,5 @@ export * from './MatchStatus';
 export * from './NextMatchCard';
 export * from './LiveMatchCard';
 export * from './UpcomingMatchCard';
+export * from './H2HCard';
+export * from './LeagueFilterBar';
