@@ -1,87 +1,86 @@
 
+## Reformular a Pagina /jogos-do-dia no Padrao da /ao-vivo
 
-## Corrigir 3 Problemas na Pagina /ao-vivo
+### O que muda
 
-### Problema 1: Filtro nao funciona bem
+A pagina atual mostra cards grandes com links para /pre-jogo. Vamos transformar num layout identico ao /ao-vivo: lista compacta agrupada por liga, com accordion que expande detalhes inline. Em vez de stats ao vivo, o detalhe expandido mostra informacoes de pre-jogo (predicoes, H2H, desfalques, escalacao).
 
-**Causa raiz:** O `PriorityFilterBar` tem um bug no onClick dos botoes de grupo. Ao chamar `togglePriority` varias vezes dentro de um `forEach`, cada chamada aciona um `setState` que referencia o estado anterior de forma inconsistente (closure stale). Exemplo: ao clicar "Europa" (priorities [2, 3]), ele chama `togglePriority(2)` e `togglePriority(3)` em sequencia, mas ambos usam o mesmo snapshot de `prev`, entao so um deles efetivamente muda.
+### Problema atual do hook useTodayFixtures
 
-**Correcao:** Trocar a logica do `PriorityFilterBar` para chamar `setVisiblePriorities` diretamente com o novo array completo, em vez de chamar `togglePriority` multiplas vezes. Adicionar tambem uma funcao `setPriorities` no hook `useFilteredLiveFixtures` para suportar isso.
-
-### Problema 2: "Mostrar todos" so abre 3 jogos — quero 5 por default
-
-**Causa raiz:** O default de `visiblePriorities` e `[1, 2]`, que so mostra jogos de ligas P1 e P2. Se poucas ligas P1/P2 tem jogos ao vivo, aparecem poucos. O "OtherMatchesBanner" funciona como toggle mas depende de clique manual.
-
-**Correcao:** Mudar o default de `visiblePriorities` para `[1, 2, 3]` (mostrar TODAS as ligas monitoradas por padrao). Isso garante que ao abrir a pagina, todos os jogos monitorados aparecem. Tambem adicionar um limite visivel de 5 fixtures por grupo de liga no `OtherMatchesBanner` com botao "ver mais" para expandir.
-
-### Problema 3: Fotos dos jogadores e notas sumiram do detalhe expandido
-
-**Causa raiz:** O `ExpandedFixturePanel` atual so usa `useFixtureStatistics` e `useFixtureEvents`. Ele NAO usa `useFixturePlayers` (que traz fotos + ratings) nem `useFixtureLineups` (que traz escalacao). O componente `PlayerRatings` ja existe no projeto mas nao esta sendo usado no painel expandido.
-
-**Correcao:** Adicionar ao `ExpandedFixturePanel`:
-- `useFixturePlayers` para buscar ratings e fotos dos jogadores
-- `useFixtureLineups` para buscar escalacao e formacao
-- Renderizar `PlayerRatings` (componente existente) dentro do painel
-- Adicionar secao de escalacao com formacao e titulares/reservas
+O hook so busca jogos de UMA liga (Paulistao por default). Precisamos buscar de TODAS as ligas monitoradas. Vamos criar um novo hook `useTodayAllFixtures` que faz uma chamada por data (sem filtro de liga) ou itera as ligas monitoradas.
 
 ---
 
 ### Detalhes Tecnicos
 
-#### Arquivo 1: `src/application/hooks/useFilteredLiveFixtures.ts`
+#### Arquivo 1: `src/application/hooks/useTodayAllFixtures.ts` (NOVO)
 
-- Mudar default de `visiblePriorities` de `[1, 2]` para `[1, 2, 3]`
+Novo hook que busca fixtures do dia para todas as ligas monitoradas:
+- Usa `useMonitoredLeagues` para obter os IDs das ligas
+- Faz uma query para cada liga usando `useQueries` do TanStack Query (ou uma unica chamada com `date=YYYY-MM-DD` sem filtro de liga, se a API suportar)
+- Alternativa mais simples: usar o endpoint `/fixtures?date=YYYY-MM-DD` sem parametro `league` — isso retorna TODOS os jogos do dia, e depois filtramos client-side pelas ligas monitoradas
+- Retorna fixtures agrupadas por liga no mesmo formato `LeagueGroup[]` usado pela /ao-vivo
 
-#### Arquivo 2: `src/presentation/components/live/PriorityFilterBar.tsx`
+#### Arquivo 2: `src/presentation/components/live/PreMatchDetailPanel.tsx` (NOVO)
 
-- Corrigir o bug do onClick: em vez de chamar `togglePriority` multiplas vezes (que causa race condition no setState), calcular o novo array de prioridades e usar uma unica chamada `setVisiblePriorities` passada como nova prop.
+Novo componente para o detalhe expandido de pre-jogo. Similar ao `ExpandedFixturePanel` mas com dados de pre-jogo:
+- Props: `fixture: Fixture`
+- Busca dados lazy (so quando montado):
+  - `usePredictions(fixture.id)` — predicoes de IA
+  - `useH2H(fixture.homeTeam.id, fixture.awayTeam.id)` — confronto direto
+  - `useInjuries(fixture.id, fixture.homeTeam.id)` — desfalques
+  - `useFixtureLineups(fixture.id)` — escalacao (se disponivel)
+- Layout:
+  - Header: escudos grandes + VS ou placar + horario/status
+  - Horarios em 3 fusos (Brasil, NZ, Local) — reusar `getMatchTimezones`
+  - Estadio + arbitro
+  - Grid 2 colunas (desktop) / 1 coluna (mobile):
+    - Predicoes (reusar `PredictionWidget`)
+    - H2H (reusar `H2HCard`)
+  - Full width: Desfalques (reusar `InjuriesPanel`)
+  - Full width: Escalacao (reusar logica do `ExpandedFixturePanel`)
+- Se o jogo esta ao vivo: mostrar badge "AO VIVO" e link para /ao-vivo?fixture=ID
+- Se o jogo terminou: mostrar placar final + stats/eventos (reusar `ExpandedFixturePanel` inline)
 
-Logica corrigida:
+#### Arquivo 3: `src/presentation/pages/site/TodayMatches.tsx` (REESCREVER)
+
+Reescrever a pagina seguindo o padrao da LiveDashboard:
+- Layout: `max-w-4xl mx-auto`, single column
+- Header: titulo "Jogos do Dia" + data formatada + badge com contagem
+- Filtro: reusar `LeagueFilterBar` (ja existente na pagina, manter)
+- Lista: usar `CompactFixtureRow` para cada jogo (mesmo componente da /ao-vivo)
+- Accordion: `expandedFixtureId` state, clicar expande/colapsa
+- Quando expande:
+  - Se jogo NAO comecou: mostrar `PreMatchDetailPanel`
+  - Se jogo ao vivo: mostrar `ExpandedFixturePanel` (com stats ao vivo)
+  - Se jogo terminou: mostrar `ExpandedFixturePanel` (com resultado final)
+- Agrupamento por liga com `LeagueGroupHeader` (reusar da /ao-vivo)
+- Deep link: suportar `?fixture=ID` para abrir expandido
+- Estados: loading spinner, empty state, error state
+
+#### Arquivo 4: `src/presentation/components/live/index.ts` (ATUALIZAR)
+
+Adicionar export do novo `PreMatchDetailPanel`.
+
+### Fluxo do Usuario
+
 ```text
-onClick para "Brasil + Liberta" (priorities [1]):
-  Se P1 ja ativo -> remover P1 do array
-  Se P1 inativo -> adicionar P1 ao array
-
-onClick para "Europa" (priorities [2, 3]):
-  Se P2 e P3 ambos ativos -> remover ambos
-  Senao -> adicionar ambos
-
-Usar uma unica chamada onSetPriorities(newArray) em vez de togglePriority x N
+Abre /jogos-do-dia
+  -> Ve lista compacta de todos os jogos do dia agrupados por liga
+  -> Filtros de liga no topo (Brasil, Continental, Europa)
+  -> Clica num jogo que ainda nao comecou
+     -> Expande inline com: predicoes, H2H, desfalques, escalacao, horarios
+  -> Clica num jogo ao vivo
+     -> Expande inline com: placar, stats, eventos (mesmo da /ao-vivo)
+  -> Clica num jogo finalizado
+     -> Expande inline com: placar final, stats, eventos
 ```
-
-Adicionar prop `onSetPriorities: (priorities: number[]) => void` e usar `setVisiblePriorities` do hook.
-
-#### Arquivo 3: `src/presentation/components/live/ExpandedFixturePanel.tsx`
-
-Adicionar 3 novas secoes ao painel expandido:
-
-1. **Player Ratings** (secao "Melhores em Campo"):
-   - Usar `useFixturePlayers(fixture.id, display.homeTeam.id)`
-   - Renderizar `PlayerRatings` componente existente
-   - Mostra fotos dos jogadores + nota + posicao
-
-2. **Lineups** (secao "Escalacao"):
-   - Usar `useFixtureLineups(fixture.id)`
-   - Mostrar formacao (ex: "4-3-3")
-   - Listar titulares e reservas com numero e posicao
-
-3. **Layout atualizado**:
-   - Manter stats e eventos nas 2 colunas superiores
-   - Adicionar abaixo: player ratings (full width)
-   - Adicionar abaixo: lineups em 2 colunas (home | away)
-   - Remover `maxStats={7}` para mostrar TODAS as estatisticas
-   - Remover `maxEvents={8}` para mostrar TODOS os eventos
-
-#### Arquivo 4: `src/presentation/pages/site/LiveDashboard.tsx`
-
-- Passar `setVisiblePriorities` como prop para `PriorityFilterBar`
 
 ### Arquivos impactados
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/application/hooks/useFilteredLiveFixtures.ts` | Default `[1,2,3]` |
-| `src/presentation/components/live/PriorityFilterBar.tsx` | Fix toggle bug, nova prop |
-| `src/presentation/components/live/ExpandedFixturePanel.tsx` | Adicionar players + lineups + remover limites |
-| `src/presentation/pages/site/LiveDashboard.tsx` | Passar `setVisiblePriorities` |
-
+| `src/application/hooks/useTodayAllFixtures.ts` | NOVO — busca fixtures do dia de todas as ligas |
+| `src/presentation/components/live/PreMatchDetailPanel.tsx` | NOVO — detalhe inline de pre-jogo |
+| `src/presentation/pages/site/TodayMatches.tsx` | REESCREVER — layout igual /ao-vivo com accordion |
+| `src/presentation/components/live/index.ts` | Adicionar export |
