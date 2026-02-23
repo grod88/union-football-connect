@@ -1,76 +1,55 @@
 
 
-## Fase 3 — Application Hooks (React Query)
+## Validar e Atualizar monitored_leagues
 
-Criar 6 hooks seguindo o padrao existente do projeto (singleton `footballRepository`, `useQuery` do TanStack v5, retorno direto do `useQuery` ou objeto customizado).
+### Situacao atual
 
-### Padrao identificado nos hooks existentes
+A tabela `monitored_leagues` ja existe no banco com 10 ligas, mas precisa de ajustes:
 
-- Importam `footballRepository` de `@/infrastructure/api-football/repository`
-- Usam `useQuery<Type, Error>()` com query key array
-- Exportam como `export const` ou `export function`
-- Retornam o resultado do `useQuery` diretamente ou um objeto desestruturado
+1. **Coluna `country_flag` nao existe** -- a tabela nao tem esse campo. Sera adicionado via migration.
+2. **Prioridades incorretas**: Premier League esta como prioridade 2 (deveria ser 3), Serie B esta como prioridade 3 (deveria ser 2).
+3. **9 ligas faltando**: Europa League, Conference League, FIFA Club World Cup, Bundesliga, Ligue 1, Primeira Liga, Eredivisie, Copa Argentina, Copa de la Liga Argentina.
+4. **`is_active` incorreto**: Premier League, Serie B, La Liga, Serie A estao como `false` mas deveriam ser `true`.
 
-### Arquivos a criar
+### Plano de execucao
 
-#### 1. `src/application/hooks/usePredictions.ts`
-- Query key: `['predictions', fixtureId]`
-- Chama `footballRepository.getPredictions(fixtureId)`
-- staleTime: 1 hora (predicoes mudam pouco)
-- enabled: `fixtureId > 0`
-- Retorna `{ prediction, isLoading, error, refetch }`
+#### 1. Migration SQL
 
-#### 2. `src/application/hooks/useInjuries.ts`
-- Query key: `['injuries', fixtureId]`
-- Chama `footballRepository.getInjuries(fixtureId)`
-- staleTime: 4 horas
-- Importa `splitInjuriesByTeam` da entidade para separar home/away
-- Retorna `{ injuries, homeInjuries, awayInjuries, total, isLoading, error }`
+Adicionar coluna `country_flag` e ajustar dados:
 
-#### 3. `src/application/hooks/useFixturePlayers.ts`
-- Query key: `['fixture-players', fixtureId]`
-- Chama `footballRepository.getFixturePlayers(fixtureId)`
-- staleTime: 1 minuto, refetchInterval: 2 min quando enabled
-- Importa `topRatedPlayers` da entidade
-- Filtra por `homeTeamId` para separar jogadores
-- Retorna `{ allPlayers, homePlayers, awayPlayers, topRatedHome, topRatedAway, isLoading, error }`
+```text
+ALTER TABLE monitored_leagues ADD COLUMN IF NOT EXISTS country_flag TEXT;
+```
 
-#### 4. `src/application/hooks/useTopScorers.ts`
-- Query key: `['top-scorers', leagueId, season, type]`
-- Chama `getTopScorers` ou `getTopAssists` conforme parametro `type`
-- staleTime: 24 horas
-- Retorna `{ scorers, isLoading, error }`
+#### 2. Upsert de todas as 19 ligas
 
-#### 5. `src/application/hooks/useTeamStatistics.ts`
-- Query key: `['team-statistics', teamId, leagueId, season]`
-- Chama `footballRepository.getTeamStatistics(teamId, leagueId, season)`
-- staleTime: 24 horas
-- Retorna `{ stats, isLoading, error }`
+Usando upsert (ON CONFLICT DO UPDATE) para corrigir as 10 existentes e inserir as 9 novas:
 
-#### 6. `src/application/hooks/useLeagueFilter.ts`
-- Hook de estado local (sem API call)
-- Gerencia selecao de ligas com `useState` + `sessionStorage`
-- Lista fixa de ligas disponiveis com metadata (nome, pais, grupo)
-- Funcoes: `toggleLeague`, `selectGroup`, `selectAll`, `clearAll`
-- Retorna `{ availableLeagues, selectedLeagueIds, toggleLeague, ... }`
+**Prioridade 1 (4 ligas)** -- sem mudanca, apenas adicionar flag:
+- 475 Paulistao, 71 Brasileirao A, 73 Copa do Brasil, 13 Libertadores
 
-**Nota**: O hook `useFixtureStatisticsHalf` sera OMITIDO pois o metodo `getFixtureStatisticsHalf` nao existe na interface `IFootballRepository` nem no repository. Implementa-lo exigiria mudancas na Fase 2 (port + repository), que esta fora do escopo desta fase.
+**Prioridade 2 (6 ligas)** -- corrigir Serie B (era 3), adicionar 3 novas:
+- 11 Sul-Americana, 72 Serie B, 2 Champions League, 3 Europa League, 848 Conference League, 15 FIFA Club World Cup
 
-### Arquivo a editar
+**Prioridade 3 (9 ligas)** -- corrigir Premier League (era 2), adicionar 5 novas:
+- 39 Premier League, 140 La Liga, 135 Serie A, 78 Bundesliga, 61 Ligue 1, 94 Primeira Liga, 88 Eredivisie, 128 Copa Argentina, 130 Copa de la Liga Argentina
 
-#### 7. `src/application/hooks/index.ts`
-- Adicionar exports para os 6 novos hooks
+Todas com `is_active = true`.
 
-### Resumo tecnico
+#### 3. Atualizar types TypeScript
 
-| Hook | Arquivo | API call | staleTime | refetchInterval |
-|------|---------|----------|-----------|-----------------|
-| usePredictions | usePredictions.ts | getPredictions | 1h | nao |
-| useInjuries | useInjuries.ts | getInjuries | 4h | nao |
-| useFixturePlayers | useFixturePlayers.ts | getFixturePlayers | 1min | 2min (se enabled) |
-| useTopScorers | useTopScorers.ts | getTopScorers/getTopAssists | 24h | nao |
-| useTeamStatistics | useTeamStatistics.ts | getTeamStatistics | 24h | nao |
-| useLeagueFilter | useLeagueFilter.ts | nenhum (estado local) | n/a | n/a |
+A coluna `country_flag` sera refletida automaticamente no `types.ts` apos a migration. O tipo `monitored_leagues` ganhara o campo `country_flag: string | null`.
 
-Total: 6 novos arquivos + 1 edicao no index.ts
+#### 4. Verificacao
+
+Executar SELECT para confirmar 19 ligas com prioridades e flags corretas.
+
+### Resumo de mudancas
+
+| Acao | Detalhes |
+|------|----------|
+| Migration SQL | ADD COLUMN country_flag TEXT |
+| Data upsert | 19 ligas (4 P1, 6 P2, 9 P3) |
+| Correcoes | Premier League 2->3, Serie B 3->2, todos is_active=true |
+| Types | Atualizado automaticamente com country_flag |
 
