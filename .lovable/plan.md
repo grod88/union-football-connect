@@ -1,121 +1,87 @@
 
 
-## Redesign Completo da Pagina /ao-vivo
+## Corrigir 3 Problemas na Pagina /ao-vivo
 
-### Resumo
+### Problema 1: Filtro nao funciona bem
 
-Reescrever `LiveDashboard.tsx` de um layout 2 colunas (detalhe + sidebar) para uma lista vertical unica agrupada por liga, estilo FotMob/SofaScore, com expansao inline ao clicar.
+**Causa raiz:** O `PriorityFilterBar` tem um bug no onClick dos botoes de grupo. Ao chamar `togglePriority` varias vezes dentro de um `forEach`, cada chamada aciona um `setState` que referencia o estado anterior de forma inconsistente (closure stale). Exemplo: ao clicar "Europa" (priorities [2, 3]), ele chama `togglePriority(2)` e `togglePriority(3)` em sequencia, mas ambos usam o mesmo snapshot de `prev`, entao so um deles efetivamente muda.
 
-### Novos componentes a criar
+**Correcao:** Trocar a logica do `PriorityFilterBar` para chamar `setVisiblePriorities` diretamente com o novo array completo, em vez de chamar `togglePriority` multiplas vezes. Adicionar tambem uma funcao `setPriorities` no hook `useFilteredLiveFixtures` para suportar isso.
 
-#### 1. `src/presentation/components/live/PriorityFilterBar.tsx`
-Barra de filtro com 3 botoes toggle + contador "Mostrando X de Y".
+### Problema 2: "Mostrar todos" so abre 3 jogos — quero 5 por default
 
-- Botoes: "Brasil + Libertadores" (P1), "Europa" (P2+P3), "Todos" (sem filtro)
-- Estilos: ativo = `bg-yellow-500/20 border-yellow-500 text-yellow-300`, inativo = `bg-secondary border-border text-muted-foreground`
-- Props: `visiblePriorities`, `togglePriority`, `filteredCount`, `totalLiveCount`, `hiddenCount`
+**Causa raiz:** O default de `visiblePriorities` e `[1, 2]`, que so mostra jogos de ligas P1 e P2. Se poucas ligas P1/P2 tem jogos ao vivo, aparecem poucos. O "OtherMatchesBanner" funciona como toggle mas depende de clique manual.
 
-#### 2. `src/presentation/components/live/LeagueGroupHeader.tsx`
-Header de cada grupo de liga com flag, nome e chevron para colapsar.
+**Correcao:** Mudar o default de `visiblePriorities` para `[1, 2, 3]` (mostrar TODAS as ligas monitoradas por padrao). Isso garante que ao abrir a pagina, todos os jogos monitorados aparecem. Tambem adicionar um limite visivel de 5 fixtures por grupo de liga no `OtherMatchesBanner` com botao "ver mais" para expandir.
 
-- Borda esquerda colorida por prioridade: P1 = `border-l-primary` (dourado), P2 = `border-l-blue-500`, P3 = `border-l-gray-600`
-- Clique toggle para mostrar/esconder os jogos daquela liga
-- Props: `league`, `leagueInfo`, `fixtureCount`, `isCollapsed`, `onToggle`
+### Problema 3: Fotos dos jogadores e notas sumiram do detalhe expandido
 
-#### 3. `src/presentation/components/live/CompactFixtureRow.tsx`
-Linha compacta para cada jogo (nao expandido).
+**Causa raiz:** O `ExpandedFixturePanel` atual so usa `useFixtureStatistics` e `useFixtureEvents`. Ele NAO usa `useFixturePlayers` (que traz fotos + ratings) nem `useFixtureLineups` (que traz escalacao). O componente `PlayerRatings` ja existe no projeto mas nao esta sendo usado no painel expandido.
 
-- Layout horizontal: `[minuto] [escudo 5x5] Home [placar] Away [escudo 5x5] [status]`
-- Status badge: `1o T` (vermelho), `INT` (amarelo), `FIM` (cinza), hora local (se NS)
-- Hover: `bg-white/5 cursor-pointer`
-- Click handler para expandir
-- Props: `fixture`, `isExpanded`, `onClick`
+**Correcao:** Adicionar ao `ExpandedFixturePanel`:
+- `useFixturePlayers` para buscar ratings e fotos dos jogadores
+- `useFixtureLineups` para buscar escalacao e formacao
+- Renderizar `PlayerRatings` (componente existente) dentro do painel
+- Adicionar secao de escalacao com formacao e titulares/reservas
 
-#### 4. `src/presentation/components/live/ExpandedFixturePanel.tsx`
-Painel expandido inline (aparece abaixo da row ao clicar).
+---
 
-- Header: escudos maiores (w-12 h-12) + placar grande (text-3xl) + minuto
-- 2 colunas (md) / 1 coluna (mobile): Estatisticas (reusar `StatComparison`) + Eventos (reusar `EventTimeline`)
-- Botao de link para copiar URL com `?fixture=ID`
-- Dados carregados sob demanda: `useFixture`, `useFixtureStatistics`, `useFixtureEvents` com `enabled: isExpanded`
-- Animacao: Framer Motion `AnimatePresence` com height/opacity transition
-- Props: `fixture` (dados basicos da lista), `onClose`
+### Detalhes Tecnicos
 
-#### 5. `src/presentation/components/live/OtherMatchesBanner.tsx`
-Banner no final: "+N jogos de outras ligas [Mostrar todos]"
+#### Arquivo 1: `src/application/hooks/useFilteredLiveFixtures.ts`
 
-- Aparece quando `hiddenCount > 0`
-- Ao clicar, expande mostrando jogos nao monitorados agrupados por liga
-- Props: `hiddenCount`, `allFixtures`, `monitoredIds`
+- Mudar default de `visiblePriorities` de `[1, 2]` para `[1, 2, 3]`
 
-#### 6. `src/presentation/components/live/EmptyLiveState.tsx`
-Estado vazio quando nao ha jogos nas ligas filtradas.
+#### Arquivo 2: `src/presentation/components/live/PriorityFilterBar.tsx`
 
-- Icone + texto "Nenhum jogo ao vivo agora"
-- Proximo jogo monitorado usando `useNextMatch()`
-- Link para pre-jogo e calendario
+- Corrigir o bug do onClick: em vez de chamar `togglePriority` multiplas vezes (que causa race condition no setState), calcular o novo array de prioridades e usar uma unica chamada `setVisiblePriorities` passada como nova prop.
 
-### Arquivo principal reescrito
-
-#### `src/presentation/pages/site/LiveDashboard.tsx`
-Reescrita completa:
-
-- Remove: layout `grid lg:grid-cols-3`, coluna lateral, `LiveMatchCard`, busca de fixture individual no nivel da pagina
-- Usa: `useFilteredLiveFixtures()` + `useLiveFixtures()` (para "outros jogos")
-- Estado local: `expandedFixtureId: number | null` (accordion - so 1 expandido)
-- Estado local: `collapsedLeagues: Set<number>` (ligas colapsadas)
-- Container: `max-w-4xl mx-auto px-4` (mais estreito e focado)
-- Deep link: se URL tem `?fixture=XXX`, auto-expandir e scroll ate o jogo
-- Estrutura JSX:
-
+Logica corrigida:
 ```text
-Header
-PriorityFilterBar
-  Para cada grupo em groupedFixtures:
-    LeagueGroupHeader
-      Para cada fixture no grupo:
-        CompactFixtureRow
-        (se expandido) ExpandedFixturePanel com AnimatePresence
-OtherMatchesBanner (se hiddenCount > 0)
-EmptyLiveState (se filteredCount === 0)
-Footer
+onClick para "Brasil + Liberta" (priorities [1]):
+  Se P1 ja ativo -> remover P1 do array
+  Se P1 inativo -> adicionar P1 ao array
+
+onClick para "Europa" (priorities [2, 3]):
+  Se P2 e P3 ambos ativos -> remover ambos
+  Senao -> adicionar ambos
+
+Usar uma unica chamada onSetPriorities(newArray) em vez de togglePriority x N
 ```
 
-### Barrel export
+Adicionar prop `onSetPriorities: (priorities: number[]) => void` e usar `setVisiblePriorities` do hook.
 
-#### `src/presentation/components/live/index.ts`
-Exportar todos os novos componentes.
+#### Arquivo 3: `src/presentation/components/live/ExpandedFixturePanel.tsx`
 
-### Detalhes tecnicos
+Adicionar 3 novas secoes ao painel expandido:
 
-| Aspecto | Implementacao |
-|---------|--------------|
-| Animacao expansao | `framer-motion` `AnimatePresence` + `motion.div` com `initial/animate/exit` em height e opacity |
-| Dados sob demanda | `useFixture(id, { enabled: isExpanded })` -- so busca quando expandido |
-| Accordion | Estado `expandedFixtureId` -- ao clicar outro jogo, fecha o anterior |
-| Deep link ?fixture=ID | `useEffect` com `useSearchParams` para auto-expandir + `scrollIntoView` |
-| Copiar link | `navigator.clipboard.writeText` com URL + `?fixture=ID` |
-| Responsividade mobile | Nomes truncados, escudos 4x4, stats/eventos em 1 coluna, `px-2` |
-| Reutilizacao | `StatComparison`, `EventTimeline`, `TeamBadge`, `MatchTimer` -- todos existentes |
+1. **Player Ratings** (secao "Melhores em Campo"):
+   - Usar `useFixturePlayers(fixture.id, display.homeTeam.id)`
+   - Renderizar `PlayerRatings` componente existente
+   - Mostra fotos dos jogadores + nota + posicao
+
+2. **Lineups** (secao "Escalacao"):
+   - Usar `useFixtureLineups(fixture.id)`
+   - Mostrar formacao (ex: "4-3-3")
+   - Listar titulares e reservas com numero e posicao
+
+3. **Layout atualizado**:
+   - Manter stats e eventos nas 2 colunas superiores
+   - Adicionar abaixo: player ratings (full width)
+   - Adicionar abaixo: lineups em 2 colunas (home | away)
+   - Remover `maxStats={7}` para mostrar TODAS as estatisticas
+   - Remover `maxEvents={8}` para mostrar TODOS os eventos
+
+#### Arquivo 4: `src/presentation/pages/site/LiveDashboard.tsx`
+
+- Passar `setVisiblePriorities` como prop para `PriorityFilterBar`
 
 ### Arquivos impactados
 
-| Arquivo | Acao |
-|---------|------|
-| `src/presentation/components/live/PriorityFilterBar.tsx` | Criar |
-| `src/presentation/components/live/LeagueGroupHeader.tsx` | Criar |
-| `src/presentation/components/live/CompactFixtureRow.tsx` | Criar |
-| `src/presentation/components/live/ExpandedFixturePanel.tsx` | Criar |
-| `src/presentation/components/live/OtherMatchesBanner.tsx` | Criar |
-| `src/presentation/components/live/EmptyLiveState.tsx` | Criar |
-| `src/presentation/components/live/index.ts` | Criar |
-| `src/presentation/pages/site/LiveDashboard.tsx` | Reescrever |
-
-### O que NAO muda
-
-- Hooks existentes (`useFixture`, `useFixtureStatistics`, `useFixtureEvents`, `useLiveFixtures`, `useFilteredLiveFixtures`, `useMonitoredLeagues`, `useNextMatch`)
-- Componentes reutilizados (`StatComparison`, `EventTimeline`, `TeamBadge`, `MatchTimer`, `Scoreboard`)
-- Header e Footer globais
-- Rotas (`/ao-vivo` continua no mesmo path)
-- Funcionalidade: mesmas informacoes, apenas layout diferente
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/application/hooks/useFilteredLiveFixtures.ts` | Default `[1,2,3]` |
+| `src/presentation/components/live/PriorityFilterBar.tsx` | Fix toggle bug, nova prop |
+| `src/presentation/components/live/ExpandedFixturePanel.tsx` | Adicionar players + lineups + remover limites |
+| `src/presentation/pages/site/LiveDashboard.tsx` | Passar `setVisiblePriorities` |
 
