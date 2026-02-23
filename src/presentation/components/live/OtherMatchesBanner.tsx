@@ -6,7 +6,9 @@ import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Fixture } from '@/core/domain/entities/fixture';
+import { AnimatePresence } from 'framer-motion';
 import { CompactFixtureRow } from './CompactFixtureRow';
+import { ExpandedFixturePanel } from './ExpandedFixturePanel';
 
 interface OtherMatchesBannerProps {
   hiddenCount: number;
@@ -72,14 +74,23 @@ export const OtherMatchesBanner = ({
                   {group.league.name}
                 </span>
               </div>
-              {group.fixtures.map((fixture) => (
-                <CompactFixtureRow
-                  key={fixture.id}
-                  fixture={fixture}
-                  isExpanded={expandedFixtureId === fixture.id}
-                  onClick={() => onFixtureClick(fixture.id)}
-                />
-              ))}
+              {group.fixtures.map((fixture) => {
+                const isExpanded = expandedFixtureId === fixture.id;
+                return (
+                  <div key={fixture.id}>
+                    <CompactFixtureRow
+                      fixture={fixture}
+                      isExpanded={isExpanded}
+                      onClick={() => onFixtureClick(fixture.id)}
+                    />
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <ExpandedFixturePanel fixture={fixture} />
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>

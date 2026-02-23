@@ -11,9 +11,10 @@ import { Trophy, CalendarDays, ChevronRight } from "lucide-react";
 import { StandingsTable } from "@/presentation/components/standings/StandingsTable";
 import { TeamBadge } from "@/presentation/components/match/TeamBadge";
 import { useTodayFixtures } from "@/application/hooks/useTodayFixtures";
+import { useNextMatch } from "@/application/hooks/useNextMatch";
 import { isFixtureLive, isFixtureFinished, getScoreDisplay } from "@/core/domain/entities/fixture";
 import { getMatchTimezones } from "@/application/services/timezone.service";
-import { LEAGUES, CURRENT_SEASON, TEAMS } from "@/config/constants";
+import { TEAMS } from "@/config/constants";
 import { ROUTES } from "@/config/routes";
 import { cn } from "@/lib/utils";
 
@@ -111,6 +112,14 @@ const TodayMatchesSummary = () => {
 };
 
 const StandingsSummary = () => {
+  const { data: nextMatch } = useNextMatch();
+
+  const leagueId = nextMatch?.league?.id;
+  const season = nextMatch?.league?.season;
+  const leagueName = nextMatch?.league?.name;
+
+  if (!leagueId || !season) return null;
+
   return (
     <section className="py-16 px-4">
       <div className="container mx-auto max-w-4xl">
@@ -123,7 +132,7 @@ const StandingsSummary = () => {
           <div className="flex items-center gap-2">
             <Trophy size={20} className="text-primary" />
             <h2 className="font-heading text-2xl sm:text-3xl uppercase gold-text">
-              Classificação
+              {leagueName || 'Classificação'}
             </h2>
           </div>
           <Link
@@ -135,8 +144,8 @@ const StandingsSummary = () => {
         </motion.div>
 
         <StandingsTable
-          leagueId={LEAGUES.PAULISTAO}
-          season={CURRENT_SEASON}
+          leagueId={leagueId}
+          season={season}
           highlightTeamIds={[TEAMS.SAO_PAULO]}
           compact
           maxRows={6}
