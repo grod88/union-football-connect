@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 
 interface PriorityFilterBarProps {
   visiblePriorities: number[];
-  togglePriority: (priority: number) => void;
+  onSetPriorities: (priorities: number[]) => void;
   showAll: () => void;
   filteredCount: number;
   totalLiveCount: number;
@@ -19,12 +19,25 @@ const FILTER_BUTTONS = [
 
 export const PriorityFilterBar = ({
   visiblePriorities,
-  togglePriority,
+  onSetPriorities,
   showAll,
   filteredCount,
   totalLiveCount,
 }: PriorityFilterBarProps) => {
   const isAllActive = visiblePriorities.includes(1) && visiblePriorities.includes(2) && visiblePriorities.includes(3);
+
+  const handleGroupClick = (groupPriorities: readonly number[]) => {
+    const allActive = groupPriorities.every(p => visiblePriorities.includes(p));
+    let next: number[];
+    if (allActive) {
+      // Remove all priorities in this group
+      next = visiblePriorities.filter(p => !groupPriorities.includes(p));
+    } else {
+      // Add all priorities in this group
+      next = [...new Set([...visiblePriorities, ...groupPriorities])];
+    }
+    onSetPriorities(next);
+  };
 
   return (
     <div className="card-surface rounded-xl p-3 sm:p-4 mb-6">
@@ -34,19 +47,7 @@ export const PriorityFilterBar = ({
           return (
             <button
               key={btn.id}
-              onClick={() => btn.priorities.forEach(p => {
-                // Toggle all priorities in this group together
-                const allActive = btn.priorities.every(pp => visiblePriorities.includes(pp));
-                if (allActive) {
-                  btn.priorities.forEach(pp => {
-                    if (visiblePriorities.includes(pp)) togglePriority(pp);
-                  });
-                } else {
-                  btn.priorities.forEach(pp => {
-                    if (!visiblePriorities.includes(pp)) togglePriority(pp);
-                  });
-                }
-              })}
+              onClick={() => handleGroupClick(btn.priorities)}
               className={cn(
                 'px-3 py-1.5 rounded-lg text-sm border transition-all',
                 isActive
