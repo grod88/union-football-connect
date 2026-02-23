@@ -63,9 +63,8 @@ export const H2HCard = ({
 
       {/* Summary */}
       <div className="flex items-center justify-center gap-1.5 sm:gap-4 md:gap-8 mb-6 min-w-0">
-        <div className="flex flex-col items-center gap-1 shrink min-w-0">
-          <img src={team1.logo} alt={team1.name} className="w-6 h-6 sm:w-10 sm:h-10 md:w-12 md:h-12 object-contain" />
-          <span className="text-[10px] sm:text-xs text-muted-foreground truncate max-w-[48px] sm:max-w-[80px] text-center">{team1.name}</span>
+        <div className="shrink-0">
+          <img src={team1.logo} alt={team1.name} className="w-7 h-7 sm:w-8 sm:h-8 object-contain" />
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-3 md:gap-6">
@@ -83,9 +82,8 @@ export const H2HCard = ({
           </div>
         </div>
 
-        <div className="flex flex-col items-center gap-1 shrink min-w-0">
-          <img src={team2.logo} alt={team2.name} className="w-6 h-6 sm:w-10 sm:h-10 md:w-12 md:h-12 object-contain" />
-          <span className="text-[10px] sm:text-xs text-muted-foreground truncate max-w-[48px] sm:max-w-[80px] text-center">{team2.name}</span>
+        <div className="shrink-0">
+          <img src={team2.logo} alt={team2.name} className="w-7 h-7 sm:w-8 sm:h-8 object-contain" />
         </div>
       </div>
 
