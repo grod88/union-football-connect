@@ -46,7 +46,7 @@ const ObsEvents = () => {
   if (isLoadingFixture || isLoadingEvents) {
     return (
       <OBSLayout className="flex items-center justify-center p-4">
-        <LoadingSpinner size="lg" />
+        <div className="animate-pulse text-white/40 text-sm">Carregando...</div>
       </OBSLayout>
     );
   }
@@ -54,10 +54,7 @@ const ObsEvents = () => {
   if (error) {
     return (
       <OBSLayout className="flex items-center justify-center p-4">
-        <ErrorMessage
-          message="Erro ao carregar eventos"
-          onRetry={() => refetch()}
-        />
+        <div className="animate-pulse text-white/40 text-sm">Carregando...</div>
       </OBSLayout>
     );
   }
