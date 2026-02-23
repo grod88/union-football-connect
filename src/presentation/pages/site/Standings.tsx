@@ -86,26 +86,28 @@ const StandingsPage = () => {
           </motion.div>
 
           {/* League selector */}
-          <div className="flex flex-wrap gap-2 items-center mb-6">
-            {leagueGroups.map((group, gi) => (
-              <div key={group.label} className="flex items-center gap-1.5">
-                {gi > 0 && (
-                  <div className="w-px h-6 bg-border mx-1 shrink-0" />
-                )}
-                {group.leagues.map((league) => (
-                  <button
-                    key={league.id}
-                    onClick={() => setSelectedLeagueId(league.id)}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors whitespace-nowrap border',
-                      selectedLeagueId === league.id
-                        ? 'bg-primary/20 border-primary text-primary'
-                        : 'bg-secondary/50 border-border text-muted-foreground hover:border-primary/50'
-                    )}
-                  >
-                    {league.flag} {league.name}
-                  </button>
-                ))}
+          <div className="space-y-3 mb-6">
+            {leagueGroups.map((group) => (
+              <div key={group.label}>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1.5 block">
+                  {group.label}
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {group.leagues.map((league) => (
+                    <button
+                      key={league.id}
+                      onClick={() => setSelectedLeagueId(league.id)}
+                      className={cn(
+                        'inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors border',
+                        selectedLeagueId === league.id
+                          ? 'bg-primary/20 border-primary text-primary'
+                          : 'bg-secondary/50 border-border text-muted-foreground hover:border-primary/50'
+                      )}
+                    >
+                      {league.flag} {league.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
