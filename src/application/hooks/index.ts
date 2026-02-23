@@ -14,3 +14,5 @@ export * from './useTopScorers';
 export * from './useTeamStatistics';
 export * from './useLeagueFilter';
 export * from './useH2H';
+export * from './useMonitoredLeagues';
+export * from './useFilteredLiveFixtures';
