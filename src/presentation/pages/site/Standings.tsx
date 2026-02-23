@@ -12,34 +12,45 @@ import { TopScorersTable } from '@/presentation/components/players/TopScorersTab
 import { LEAGUES, CURRENT_SEASON, TEAMS } from '@/config/constants';
 import { cn } from '@/lib/utils';
 
-const leagueGroups = [
+const EURO_SEASON = CURRENT_SEASON - 1; // European leagues run Aug-May
+
+interface LeagueOption {
+  id: number;
+  name: string;
+  flag: string;
+  season: number;
+}
+
+const leagueGroups: { label: string; leagues: LeagueOption[] }[] = [
   {
     label: 'Brasil',
     leagues: [
-      { id: LEAGUES.PAULISTAO, name: 'Paulistão', flag: '🏆' },
-      { id: LEAGUES.BRASILEIRAO_A, name: 'Brasileirão A', flag: '🇧🇷' },
-      { id: LEAGUES.BRASILEIRAO_B, name: 'Série B', flag: '🇧🇷' },
+      { id: LEAGUES.PAULISTAO, name: 'Paulistão', flag: '🏆', season: CURRENT_SEASON },
+      { id: LEAGUES.BRASILEIRAO_A, name: 'Brasileirão A', flag: '🇧🇷', season: CURRENT_SEASON },
+      { id: LEAGUES.BRASILEIRAO_B, name: 'Série B', flag: '🇧🇷', season: CURRENT_SEASON },
     ],
   },
   {
     label: 'Continental',
     leagues: [
-      { id: LEAGUES.LIBERTADORES, name: 'Libertadores', flag: '🌎' },
-      { id: LEAGUES.CHAMPIONS_LEAGUE, name: 'Champions', flag: '🇪🇺' },
+      { id: LEAGUES.LIBERTADORES, name: 'Libertadores', flag: '🌎', season: EURO_SEASON },
+      { id: LEAGUES.CHAMPIONS_LEAGUE, name: 'Champions', flag: '🇪🇺', season: EURO_SEASON },
     ],
   },
   {
     label: 'Europa',
     leagues: [
-      { id: LEAGUES.PREMIER_LEAGUE, name: 'Premier League', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
-      { id: LEAGUES.LA_LIGA, name: 'La Liga', flag: '🇪🇸' },
-      { id: LEAGUES.SERIE_A_ITALY, name: 'Serie A', flag: '🇮🇹' },
-      { id: LEAGUES.BUNDESLIGA, name: 'Bundesliga', flag: '🇩🇪' },
-      { id: LEAGUES.LIGUE_1, name: 'Ligue 1', flag: '🇫🇷' },
-      { id: LEAGUES.PRIMEIRA_LIGA, name: 'Primeira Liga', flag: '🇵🇹' },
+      { id: LEAGUES.PREMIER_LEAGUE, name: 'Premier League', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', season: EURO_SEASON },
+      { id: LEAGUES.LA_LIGA, name: 'La Liga', flag: '🇪🇸', season: EURO_SEASON },
+      { id: LEAGUES.SERIE_A_ITALY, name: 'Serie A', flag: '🇮🇹', season: EURO_SEASON },
+      { id: LEAGUES.BUNDESLIGA, name: 'Bundesliga', flag: '🇩🇪', season: EURO_SEASON },
+      { id: LEAGUES.LIGUE_1, name: 'Ligue 1', flag: '🇫🇷', season: EURO_SEASON },
+      { id: LEAGUES.PRIMEIRA_LIGA, name: 'Primeira Liga', flag: '🇵🇹', season: EURO_SEASON },
     ],
   },
 ];
+
+const allLeagues = leagueGroups.flatMap(g => g.leagues);
 
 const featuredTeamIds = [
   TEAMS.SAO_PAULO,
@@ -75,7 +86,7 @@ const StandingsPage = () => {
           </motion.div>
 
           {/* League selector */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-6 scrollbar-thin">
+          <div className="flex flex-wrap gap-2 items-center mb-6">
             {leagueGroups.map((group, gi) => (
               <div key={group.label} className="flex items-center gap-1.5">
                 {gi > 0 && (
@@ -100,29 +111,36 @@ const StandingsPage = () => {
           </div>
 
           {/* Standings table */}
-          <div className="mb-8">
-            <StandingsTable
-              leagueId={selectedLeagueId}
-              season={CURRENT_SEASON}
-              highlightTeamIds={featuredTeamIds}
-            />
-          </div>
+          {(() => {
+            const season = allLeagues.find(l => l.id === selectedLeagueId)?.season ?? CURRENT_SEASON;
+            return (
+              <>
+                <div className="mb-8">
+                  <StandingsTable
+                    leagueId={selectedLeagueId}
+                    season={season}
+                    highlightTeamIds={featuredTeamIds}
+                  />
+                </div>
 
-          {/* Top scorers + assists */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <TopScorersTable
-              leagueId={selectedLeagueId}
-              season={CURRENT_SEASON}
-              type="goals"
-              limit={10}
-            />
-            <TopScorersTable
-              leagueId={selectedLeagueId}
-              season={CURRENT_SEASON}
-              type="assists"
-              limit={10}
-            />
-          </div>
+                {/* Top scorers + assists */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <TopScorersTable
+                    leagueId={selectedLeagueId}
+                    season={season}
+                    type="goals"
+                    limit={10}
+                  />
+                  <TopScorersTable
+                    leagueId={selectedLeagueId}
+                    season={season}
+                    type="assists"
+                    limit={10}
+                  />
+                </div>
+              </>
+            );
+          })()}
         </div>
       </main>
 
