@@ -12,13 +12,33 @@ import { TopScorersTable } from '@/presentation/components/players/TopScorersTab
 import { LEAGUES, CURRENT_SEASON, TEAMS } from '@/config/constants';
 import { cn } from '@/lib/utils';
 
-const leagueOptions = [
-  { id: LEAGUES.PAULISTAO, name: 'Paulistão', flag: '🏆' },
-  { id: LEAGUES.BRASILEIRAO_A, name: 'Brasileirão A', flag: '🇧🇷' },
-  { id: LEAGUES.BRASILEIRAO_B, name: 'Série B', flag: '🇧🇷' },
-  { id: LEAGUES.COPA_DO_BRASIL, name: 'Copa do Brasil', flag: '🏆' },
-  { id: LEAGUES.LIBERTADORES, name: 'Libertadores', flag: '🌎' },
-  { id: LEAGUES.SULAMERICANA, name: 'Sul-Americana', flag: '🌎' },
+const leagueGroups = [
+  {
+    label: 'Brasil',
+    leagues: [
+      { id: LEAGUES.PAULISTAO, name: 'Paulistão', flag: '🏆' },
+      { id: LEAGUES.BRASILEIRAO_A, name: 'Brasileirão A', flag: '🇧🇷' },
+      { id: LEAGUES.BRASILEIRAO_B, name: 'Série B', flag: '🇧🇷' },
+    ],
+  },
+  {
+    label: 'Continental',
+    leagues: [
+      { id: LEAGUES.LIBERTADORES, name: 'Libertadores', flag: '🌎' },
+      { id: LEAGUES.CHAMPIONS_LEAGUE, name: 'Champions', flag: '🇪🇺' },
+    ],
+  },
+  {
+    label: 'Europa',
+    leagues: [
+      { id: LEAGUES.PREMIER_LEAGUE, name: 'Premier League', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+      { id: LEAGUES.LA_LIGA, name: 'La Liga', flag: '🇪🇸' },
+      { id: LEAGUES.SERIE_A_ITALY, name: 'Serie A', flag: '🇮🇹' },
+      { id: LEAGUES.BUNDESLIGA, name: 'Bundesliga', flag: '🇩🇪' },
+      { id: LEAGUES.LIGUE_1, name: 'Ligue 1', flag: '🇫🇷' },
+      { id: LEAGUES.PRIMEIRA_LIGA, name: 'Primeira Liga', flag: '🇵🇹' },
+    ],
+  },
 ];
 
 const featuredTeamIds = [
@@ -55,20 +75,27 @@ const StandingsPage = () => {
           </motion.div>
 
           {/* League selector */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-6">
-            {leagueOptions.map((league) => (
-              <button
-                key={league.id}
-                onClick={() => setSelectedLeagueId(league.id)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors whitespace-nowrap border',
-                  selectedLeagueId === league.id
-                    ? 'bg-primary/20 border-primary text-primary'
-                    : 'bg-secondary/50 border-border text-muted-foreground hover:border-primary/50'
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-6 scrollbar-thin">
+            {leagueGroups.map((group, gi) => (
+              <div key={group.label} className="flex items-center gap-1.5">
+                {gi > 0 && (
+                  <div className="w-px h-6 bg-border mx-1 shrink-0" />
                 )}
-              >
-                {league.flag} {league.name}
-              </button>
+                {group.leagues.map((league) => (
+                  <button
+                    key={league.id}
+                    onClick={() => setSelectedLeagueId(league.id)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors whitespace-nowrap border',
+                      selectedLeagueId === league.id
+                        ? 'bg-primary/20 border-primary text-primary'
+                        : 'bg-secondary/50 border-border text-muted-foreground hover:border-primary/50'
+                    )}
+                  >
+                    {league.flag} {league.name}
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
 
