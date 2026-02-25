@@ -37,14 +37,22 @@ const ObsPoll = () => {
   }
 
   return (
-    <OBSLayout className="flex items-center justify-center p-4">
-      <Poll
-        initialPoll={poll}
-        variant="obs"
-        simulateInitialVotes={simulateVotes}
-        className="w-full max-w-md"
-      />
-    </OBSLayout>
+    <div className="bg-transparent p-2 flex items-center justify-center">
+      <div
+        className="rounded-xl overflow-hidden p-4 w-full max-w-md"
+        style={{
+          background: 'linear-gradient(135deg, rgba(30,25,22,0.95) 0%, rgba(20,18,16,0.98) 100%)',
+          border: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        <Poll
+          initialPoll={poll}
+          variant="obs"
+          simulateInitialVotes={simulateVotes}
+          className="w-full"
+        />
+      </div>
+    </div>
   );
 };
 
