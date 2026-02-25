@@ -1,33 +1,26 @@
 
 
-## Fix: Confronto Direto overflow no grid de 2 colunas
+## Fix: CORS blocking API calls from custom domain `https://unionfc.live`
 
 ### Problema
 
-No `PreMatchDetailPanel`, o grid `md:grid-cols-2` divide o espaco entre Predicao e H2H. O H2HCard usa `shrink-0` nos containers dos logos, impedindo que encolham quando o espaco e limitado. Resultado: o logo do time 2 (Club Brugge) extravasa o card.
+A funcao `isOriginAllowed` no edge function `api-football-proxy` so permite origins de `*.lovable.app`, `*.lovableproject.com` e `localhost`. O novo dominio `https://unionfc.live` nao esta na lista, entao o CORS bloqueia todas as chamadas da API quando acessado pelo dominio customizado.
 
 ### Solucao
 
-Editar `src/presentation/components/match/H2HCard.tsx`:
+Editar `supabase/functions/api-football-proxy/index.ts` para adicionar `https://unionfc.live` e `https://www.unionfc.live` na funcao `isOriginAllowed`.
 
-1. Remover `shrink-0` dos containers dos logos de time (linhas 66 e 86) - permitir que encolham
-2. Adicionar `min-w-0` no container flex principal do summary para permitir shrink dos filhos
-3. Adicionar `overflow-hidden` no card root para cortar qualquer overflow residual
-4. Reduzir logo sizes para `w-6 h-6` no mobile (era `w-7 h-7`)
-5. Reduzir `max-w` dos nomes dos times para `max-w-[48px]` no mobile
+### Mudanca
 
-### Mudancas tecnicas
+```text
+Arquivo: supabase/functions/api-football-proxy/index.ts
+Linha 15-21: isOriginAllowed()
 
-| Linha | De | Para |
-|-------|----|------|
-| Root div (linha 55) | `card-surface rounded-xl p-4 md:p-6` | `card-surface rounded-xl p-4 md:p-6 overflow-hidden` |
-| Summary container (linha 65) | `flex items-center justify-center gap-2 sm:gap-4 md:gap-8 mb-6` | `flex items-center justify-center gap-1.5 sm:gap-4 md:gap-8 mb-6 min-w-0` |
-| Logo containers (linhas 66, 86) | `shrink-0` | `shrink min-w-0` |
-| Logo img (linhas 67, 87) | `w-7 h-7 sm:w-10 sm:h-10` | `w-6 h-6 sm:w-10 sm:h-10` |
-| Nome truncate (linhas 68, 88) | `max-w-[56px]` | `max-w-[48px]` |
-| Stats gap (linha 71) | `gap-2 sm:gap-3` | `gap-1.5 sm:gap-3` |
+Adicionar:
+  if (origin === "https://unionfc.live" || origin === "https://www.unionfc.live") return true;
+```
 
 ### Arquivo impactado
 
-- `src/presentation/components/match/H2HCard.tsx`
+- `supabase/functions/api-football-proxy/index.ts` (1 linha adicionada na funcao `isOriginAllowed`)
 
