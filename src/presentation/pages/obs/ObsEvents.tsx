@@ -18,7 +18,7 @@ import { parsePositiveInt } from '@/lib/validation';
 
 const ObsEvents = () => {
   const [searchParams] = useSearchParams();
-  const maxEvents = parsePositiveInt(searchParams.get('max'), 8)!;
+  const maxEvents = parsePositiveInt(searchParams.get('max'), 10)!;
   const fixtureIdNum = parsePositiveInt(searchParams.get('fixture'));
 
   const {
