@@ -66,17 +66,15 @@ const ObsScore = () => {
   const isNotStarted = fixture.status === 'NS';
 
   return (
-    <OBSLayout className="flex items-center justify-center p-1">
+    <div className="bg-transparent p-2">
       <div
         className={cn(
-          'rounded-lg px-8 py-2 flex items-center justify-center gap-4 transition-all duration-300',
+          'rounded-xl overflow-hidden px-8 py-4 flex items-center justify-center gap-4 transition-all duration-300',
           goalFlash && 'scale-110'
         )}
         style={{
-          background: goalFlash
-            ? 'linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(212,168,83,0.4) 100%)'
-            : 'linear-gradient(135deg, rgba(30,25,22,0.95) 0%, rgba(20,18,16,0.98) 100%)',
-          border: `1px solid ${goalFlash ? 'rgba(255,255,255,0.6)' : 'rgba(212,168,83,0.4)'}`,
+          background: 'linear-gradient(135deg, rgba(30,25,22,0.95) 0%, rgba(20,18,16,0.98) 100%)',
+          border: `1px solid ${goalFlash ? 'rgba(212,168,83,0.4)' : 'rgba(255,255,255,0.06)'}`,
         }}
       >
         <span className={cn(
@@ -95,7 +93,7 @@ const ObsScore = () => {
           {isNotStarted ? 0 : awayScore}
         </span>
       </div>
-    </OBSLayout>
+    </div>
   );
 };
 

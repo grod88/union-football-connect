@@ -47,12 +47,12 @@ const ObsMatchTime = () => {
   const isLive = isMatchLive(fixture.status);
 
   return (
-    <OBSLayout className="flex items-center justify-center p-1">
+    <div className="bg-transparent p-2">
       <div
-        className="rounded-lg px-6 py-2 flex items-center justify-center gap-3"
+        className="rounded-xl overflow-hidden px-6 py-3 flex items-center justify-center gap-3"
         style={{
           background: 'linear-gradient(135deg, rgba(30,25,22,0.95) 0%, rgba(20,18,16,0.98) 100%)',
-          border: '1px solid rgba(212,168,83,0.4)',
+          border: '1px solid rgba(255,255,255,0.06)',
         }}
       >
         {elapsed ? (
@@ -70,7 +70,7 @@ const ObsMatchTime = () => {
           {statusText}
         </span>
       </div>
-    </OBSLayout>
+    </div>
   );
 };
 
