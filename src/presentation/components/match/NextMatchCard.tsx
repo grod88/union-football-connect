@@ -77,7 +77,7 @@ interface NextMatchCardProps {
 
 export const NextMatchCard = ({
   teamId,
-  youtubeLink = 'https://youtube.com/live/4Xl5Ym1MvHA?feature=share',
+  youtubeLink = 'https://youtube.com/live/k7yPrXmla3M?feature=share',
   className = '',
 }: NextMatchCardProps) => {
   const { data: fixture, isLoading, error } = useNextMatch({ teamId });
