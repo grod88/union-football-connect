@@ -72,18 +72,26 @@ const ObsScoreboard = () => {
   }
 
   return (
-    <OBSLayout className={cn(
-      'flex items-center justify-center p-6 transition-all duration-300',
-      goalFlash && 'scale-105'
-    )}>
-      <Scoreboard
-        fixture={fixture}
-        size="lg"
-        variant="obs"
-        showTimer={true}
-        showLiveBadge={false}
-      />
-    </OBSLayout>
+    <div className="bg-transparent p-2">
+      <div
+        className={cn(
+          'rounded-xl overflow-hidden p-6 transition-all duration-300',
+          goalFlash && 'scale-105'
+        )}
+        style={{
+          background: 'linear-gradient(135deg, rgba(30,25,22,0.95) 0%, rgba(20,18,16,0.98) 100%)',
+          border: `1px solid ${goalFlash ? 'rgba(212,168,83,0.4)' : 'rgba(255,255,255,0.06)'}`,
+        }}
+      >
+        <Scoreboard
+          fixture={fixture}
+          size="lg"
+          variant="obs"
+          showTimer={true}
+          showLiveBadge={false}
+        />
+      </div>
+    </div>
   );
 };
 
