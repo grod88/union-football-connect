@@ -14,6 +14,7 @@ const ALLOWED_ENDPOINT_PREFIXES = [
 
 function isOriginAllowed(origin: string): boolean {
   if (!origin) return false;
+  if (origin === "https://unionfc.live" || origin === "https://www.unionfc.live") return true;
   if (origin === "http://localhost:8080" || origin === "http://localhost:5173") return true;
   if (origin.endsWith(".lovable.app") && origin.startsWith("https://")) return true;
   if (origin.endsWith(".lovableproject.com") && origin.startsWith("https://")) return true;
