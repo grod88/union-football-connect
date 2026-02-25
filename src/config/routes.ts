@@ -31,6 +31,12 @@ export const ROUTES = {
   OBS_AWAY: '/obs/away',
   OBS_SCORE: '/obs/score',
   OBS_TIME: '/obs/tempo',
+  OBS_RATINGS: '/obs/ratings',
+  OBS_LINEUPS: '/obs/escalacao',
+  OBS_STANDINGS: '/obs/classificacao',
+  OBS_PREDICTIONS: '/obs/predicao',
+  OBS_H2H: '/obs/h2h',
+  OBS_INJURIES: '/obs/desfalques',
 } as const;
 
 // Helper to check if current route is an OBS route
