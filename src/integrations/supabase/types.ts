@@ -14,6 +14,78 @@ export type Database = {
   }
   public: {
     Tables: {
+      bolinha_match_context: {
+        Row: {
+          away_team_id: number | null
+          away_team_name: string | null
+          context_summary: string | null
+          created_at: string | null
+          events_data: Json | null
+          fixture_data: Json | null
+          fixture_id: number
+          h2h_data: Json | null
+          home_team_id: number | null
+          home_team_name: string | null
+          id: string
+          injuries_data: Json | null
+          is_active: boolean | null
+          last_synced_at: string | null
+          league_name: string | null
+          league_round: string | null
+          lineups_data: Json | null
+          match_date: string | null
+          predictions_data: Json | null
+          statistics_data: Json | null
+          venue_name: string | null
+        }
+        Insert: {
+          away_team_id?: number | null
+          away_team_name?: string | null
+          context_summary?: string | null
+          created_at?: string | null
+          events_data?: Json | null
+          fixture_data?: Json | null
+          fixture_id: number
+          h2h_data?: Json | null
+          home_team_id?: number | null
+          home_team_name?: string | null
+          id?: string
+          injuries_data?: Json | null
+          is_active?: boolean | null
+          last_synced_at?: string | null
+          league_name?: string | null
+          league_round?: string | null
+          lineups_data?: Json | null
+          match_date?: string | null
+          predictions_data?: Json | null
+          statistics_data?: Json | null
+          venue_name?: string | null
+        }
+        Update: {
+          away_team_id?: number | null
+          away_team_name?: string | null
+          context_summary?: string | null
+          created_at?: string | null
+          events_data?: Json | null
+          fixture_data?: Json | null
+          fixture_id?: number
+          h2h_data?: Json | null
+          home_team_id?: number | null
+          home_team_name?: string | null
+          id?: string
+          injuries_data?: Json | null
+          is_active?: boolean | null
+          last_synced_at?: string | null
+          league_name?: string | null
+          league_round?: string | null
+          lineups_data?: Json | null
+          match_date?: string | null
+          predictions_data?: Json | null
+          statistics_data?: Json | null
+          venue_name?: string | null
+        }
+        Relationships: []
+      }
       bolinha_messages: {
         Row: {
           audio_url: string | null
