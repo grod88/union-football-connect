@@ -1,29 +1,38 @@
 
 
-## L5 — Admin Panel `/admin/bolinha`
+## L6 — Test Results and Required Fixes
 
-### Changes
+### Test Results
 
-1. **Create `src/presentation/pages/site/AdminBolinha.tsx`**
-   - Full admin panel with 4 sections: Manual Mode, AI Mode, Quick Actions, Preview (iframe), and History
-   - Manual mode: textarea + 6 emotion buttons (with mini thumbnails from Supabase storage) + TTS checkbox + Send button (broadcasts directly via Realtime)
-   - AI mode: textarea for context/prompt + TTS checkbox + Generate button (calls `bolinha-comment` edge function)
-   - Quick actions: 9 preset buttons in a 3-column grid, each calls `bolinha-comment` with predefined prompts and `generate_audio: true`
-   - Preview: iframe pointing to `/obs/bolinha?size=sm` with dark background container
-   - History: fetches last 20 rows from `bolinha_messages`, listens for Realtime inserts to auto-update, displays time + emotion badge + truncated text
-   - Dark theme styling: `bg-gray-950` page, `bg-gray-900 border-gray-800` cards, yellow send button, purple AI button
-   - Emotion selector: grid of 6 with thumbnail images, selected gets `ring-2 ring-yellow-500`
+| Test | Status | Issue |
+|------|--------|-------|
+| Widget OBS (`/obs/bolinha`) | FAIL | Images return 404 — the `bolinha-images` storage bucket exists but is **empty**. No PNG files have been uploaded. |
+| Admin panel (`/admin/bolinha`) | PARTIAL | Page renders correctly. Emotion thumbnails also broken (same 404 images). |
+| TTS (`bolinha-tts`) | PASS | Edge function works — returns base64 audio successfully. |
+| IA (`bolinha-comment`) | PASS | Edge function works — Claude generates text + emotion correctly. TTS internal call also works. |
+| Audio playback in widget | BUG | Double data-URI prefix: `bolinha-tts` returns `data:audio/mpeg;base64,...` but `ObsBolinha.tsx` wraps it again with `data:audio/mpeg;base64,${msg.audioBase64}`, producing an invalid URL. |
+| Realtime broadcast | PASS | `bolinha-comment` broadcasts successfully (log confirms REST fallback). |
+| History (postgres_changes) | NEEDS CHECK | Table exists with correct schema. Realtime publication may need enabling. |
 
-2. **Update `src/config/routes.ts`** — add `ADMIN_BOLINHA: '/admin/bolinha'`
+### Required Fixes
 
-3. **Update `src/App.tsx`** — import `AdminBolinha` and add route
+1. **Fix audio double-prefix in `ObsBolinha.tsx`** (line 78)
+   - Current: `new Audio(\`data:audio/mpeg;base64,${msg.audioBase64}\`)`
+   - Fix: `new Audio(msg.audioBase64)` — since TTS already returns the full data URI
 
-4. **Update `src/presentation/pages/site/index.ts`** — add export
+2. **Enable realtime for `bolinha_messages` table**
+   - Run SQL migration: `ALTER PUBLICATION supabase_realtime ADD TABLE public.bolinha_messages;`
+   - Required for the History section's `postgres_changes` subscription in AdminBolinha
 
-### Technical notes
-- Manual send: broadcast to channel `bolinha` event `comment`, then insert into `bolinha_messages` for history
-- AI send: invoke `bolinha-comment` edge function which handles Claude generation, TTS, broadcast, and DB insert internally
-- Quick actions use AI mode (invoke `bolinha-comment`) with `generate_audio: true`
-- History uses `postgres_changes` Realtime subscription on `bolinha_messages` table for live updates
-- No authentication required per user specification
+3. **User action required: Upload the 6 Bolinha images** to the `bolinha-images` storage bucket
+   - The bucket exists and is public, but contains no files
+   - Required filenames: `bolinha-neutro.png`, `bolinha-gol.png`, `bolinha-bravo.png`, `bolinha-analise.png`, `bolinha-sarcastico.png`, `bolinha-tedio.png`
+   - This must be done manually by the user through the backend storage interface
+
+### Technical Details
+
+- The `bolinha-tts` edge function returns `audioBase64` with value `"data:audio/mpeg;base64,SUQzBAA..."` (full data URI)
+- The `bolinha-comment` function passes this value through to the Realtime broadcast payload as-is
+- `ObsBolinha.tsx` then wraps it again, creating `"data:audio/mpeg;base64,data:audio/mpeg;base64,SUQzBAA..."` which is invalid
+- All secrets (ANTHROPIC_API_KEY, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID) are configured and working
 
