@@ -1,19 +1,45 @@
 
 
-## L3 — Update `bolinha-comment` to Use Match Context
+## L4 — Rewrite AdminBolinha with Match Context
 
-### Changes to `supabase/functions/bolinha-comment/index.ts`
+### What will be done
 
-1. **Move Supabase client creation earlier** — right after parsing the request body, before building the prompt
-2. **Fetch active match context** from `bolinha_match_context` using `.maybeSingle()` (safer than `.single()`)
-3. **Inject `context_summary`** into both `custom_prompt` and event-based prompt paths
-4. **Use `activeMatch` fallbacks** for `team_id` and `fixture_id` when not provided in the request body
-5. **No changes** to `BOLINHA_SYSTEM_PROMPT`, TTS logic, or broadcast logic
+Complete rewrite of `src/presentation/pages/site/AdminBolinha.tsx` with 3 main sections:
 
-### Specific edits
+**1. PARTIDA ATIVA (top)**
+- Input for `fixture_id` + "SINCRONIZAR" button calling `bolinha-sync-match`
+- On mount: loads active match from `bolinha_match_context` where `is_active = true`
+- Match info card showing: teams, league/round, venue, predictions summary, injury count, H2H summary, lineups availability, last sync time
+- Gold left border accent (`border-l-4 border-yellow-500`)
+- "Ver contexto completo" button opens a Dialog with the raw `context_summary` in monospace
 
-- Lines ~68-95 (after body parse, before Claude call): insert Supabase client + context fetch
-- Lines ~96-110 (prompt building): replace with context-enriched versions
-- Lines ~140-150 (db insert + broadcast): use `effectiveTeamId` and `activeMatch?.fixture_id` fallbacks
-- Move the existing Supabase client creation (currently around line 140) up, reuse for both context fetch and db operations
+**2. ATALHOS RAPIDOS (middle)**
+- 12 context-aware quick action buttons using real team names from `matchContext`
+- Prompts dynamically reference `homeName`, `awayName`, `leagueName`
+- Global "Gerar com audio (TTS)" checkbox applies to all quick actions
+- Grid: `grid-cols-2 md:grid-cols-4`, hover border yellow accent
+- Loading state with spinner overlay on active button
+
+**3. MODO LIVRE (bottom)**
+- Two sub-sections side by side (stacked on mobile):
+  - **Manual**: textarea + emotion selector (6 images) + send button with optional TTS via broadcast channel
+  - **IA**: prompt textarea + generate button calling `bolinha-comment`
+- Last generated text preview
+
+**4. PREVIEW + HISTORICO (bottom)**
+- Side by side: iframe `/obs/bolinha?size=sm` + history list
+- History with realtime subscription for live updates
+- Badge colors per emotion
+
+### Files changed
+- `src/presentation/pages/site/AdminBolinha.tsx` — full rewrite
+
+### Key implementation details
+- `matchContext` state holds the full row from `bolinha_match_context`
+- Quick actions are computed via `useMemo` depending on `matchContext`
+- H2H summary calculated from `h2h_data` array (count home/away wins + draws)
+- Predictions summary extracted from `predictions_data.predictions.winner`
+- Injuries count from `injuries_data.length`
+- Uses existing Dialog component for context summary modal
+- All existing broadcast + persist logic preserved from current implementation
 
