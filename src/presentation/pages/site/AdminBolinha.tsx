@@ -20,7 +20,7 @@ const EMOTIONS = [
 ] as const;
 
 const EMOTION_IMAGE = (emotion: string) =>
-  `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/bolinha-${emotion}.png`;
+  `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-${emotion.toUpperCase()}.png`;
 
 const QUICK_ACTIONS = [
   { icon: '⚽', label: 'GOL!', prompt: 'Acabou de sair um gol! Comemora com energia!' },

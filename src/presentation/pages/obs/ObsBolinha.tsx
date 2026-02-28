@@ -6,12 +6,12 @@ import { OBSLayout } from '@/presentation/components/layout/OBSLayout';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 const EMOTION_IMAGES: Record<string, string> = {
-  neutro: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/bolinha-neutro.png`,
-  gol: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/bolinha-gol.png`,
-  bravo: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/bolinha-bravo.png`,
-  analise: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/bolinha-analise.png`,
-  sarcastico: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/bolinha-sarcastico.png`,
-  tedio: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/bolinha-tedio.png`,
+  neutro: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-NEUTRO.png`,
+  gol: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-GOL.png`,
+  bravo: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-BRAVO.png`,
+  analise: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-ANALISE.png`,
+  sarcastico: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-SARCASTICO.png`,
+  tedio: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-TEDIO.png`,
 };
 
 interface BolinhaMessage {
