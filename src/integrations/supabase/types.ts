@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      bolinha_messages: {
+        Row: {
+          audio_url: string | null
+          created_at: string | null
+          emotion: string
+          event_type: string | null
+          fixture_id: number | null
+          id: string
+          team_id: number | null
+          text: string
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string | null
+          emotion?: string
+          event_type?: string | null
+          fixture_id?: number | null
+          id?: string
+          team_id?: number | null
+          text: string
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string | null
+          emotion?: string
+          event_type?: string | null
+          fixture_id?: number | null
+          id?: string
+          team_id?: number | null
+          text?: string
+        }
+        Relationships: []
+      }
       community_members: {
         Row: {
           country: string
@@ -204,6 +237,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clean_old_bolinha_messages: { Args: never; Returns: undefined }
       clean_old_fixtures: { Args: never; Returns: undefined }
     }
     Enums: {
