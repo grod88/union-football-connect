@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -82,6 +83,10 @@ export default function AdminBolinha() {
   const [matchContext, setMatchContext] = useState<MatchContext>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Sync timer
+  const [syncAgo, setSyncAgo] = useState('');
+  const [syncStale, setSyncStale] = useState(false);
+
   // Quick actions
   const [generateAudio, setGenerateAudio] = useState(true);
   const [quickLoading, setQuickLoading] = useState<number | null>(null);
@@ -150,6 +155,22 @@ export default function AdminBolinha() {
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
   }, []);
 
+  /* ── sync ago timer ── */
+  useEffect(() => {
+    const compute = () => {
+      const ts = matchContext?.last_synced_at;
+      if (!ts) { setSyncAgo(''); setSyncStale(false); return; }
+      const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+      if (diff < 60) { setSyncAgo(`há ${diff}s`); }
+      else if (diff < 3600) { setSyncAgo(`há ${Math.floor(diff / 60)} min`); }
+      else { setSyncAgo(`há ${Math.floor(diff / 3600)}h`); }
+      setSyncStale(diff > 600);
+    };
+    compute();
+    const id = setInterval(compute, 30_000);
+    return () => clearInterval(id);
+  }, [matchContext?.last_synced_at]);
+
   /* ── sync match ── */
   const syncMatch = useCallback(async () => {
     if (!fixtureId.trim()) return;
@@ -165,6 +186,11 @@ export default function AdminBolinha() {
           .eq('fixture_id', Number(fixtureId))
           .maybeSingle();
         setMatchContext(updated);
+        const eventsCount = Array.isArray(updated?.events_data) ? updated.events_data.length : 0;
+        const fixtureData = updated?.fixture_data as Record<string, any> | null;
+        const scoreH = fixtureData?.goals?.home ?? '-';
+        const scoreA = fixtureData?.goals?.away ?? '-';
+        toast.success(`✅ Dados atualizados — Placar: ${scoreH} x ${scoreA} | ${eventsCount} eventos`);
       }
     } finally {
       setIsSyncing(false);
@@ -256,9 +282,16 @@ export default function AdminBolinha() {
     <div className="min-h-screen bg-gray-950 text-white p-4 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
 
-        <h1 className="text-2xl font-bold flex items-center gap-2 font-['Oswald']">
-          🎮 BOLINHA — PAINEL DE CONTROLE
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold flex items-center gap-2 font-['Oswald']">
+            🎮 BOLINHA — PAINEL DE CONTROLE
+          </h1>
+          {syncAgo && (
+            <span className={`text-xs ${syncStale ? 'text-yellow-400' : 'text-gray-500'}`}>
+              Último sync: {syncAgo}
+            </span>
+          )}
+        </div>
 
         {/* ═══════ 1. PARTIDA ATIVA ═══════ */}
         <Card className="bg-gray-900 border-gray-800 border-l-4 border-l-yellow-500">
@@ -477,6 +510,18 @@ export default function AdminBolinha() {
           </Card>
         </div>
       </div>
+
+      {/* Floating re-sync FAB */}
+      {matchContext && (
+        <button
+          onClick={syncMatch}
+          disabled={isSyncing}
+          className="fixed bottom-6 right-6 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg shadow-blue-500/25 transition-all duration-200 disabled:opacity-50"
+          title="Atualizar dados do jogo"
+        >
+          <RefreshCw className={`w-6 h-6 ${isSyncing ? 'animate-spin' : ''}`} />
+        </button>
+      )}
     </div>
   );
 }
