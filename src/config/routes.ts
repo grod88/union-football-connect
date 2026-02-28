@@ -37,6 +37,7 @@ export const ROUTES = {
   OBS_PREDICTIONS: '/obs/predicao',
   OBS_H2H: '/obs/h2h',
   OBS_INJURIES: '/obs/desfalques',
+  OBS_BOLINHA: '/obs/bolinha',
 } as const;
 
 // Helper to check if current route is an OBS route
