@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.bolinha-tts]
 verify_jwt = false
+
+[functions.bolinha-comment]
+verify_jwt = false
