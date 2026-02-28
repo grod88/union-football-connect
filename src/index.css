@@ -144,3 +144,31 @@ body.obs-mode {
     font-size: clamp(1.5rem, 4vw, 3rem);
   }
 }
+
+@keyframes bolinhaFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-bolinhaFloat {
+  animation: bolinhaFloat 3s ease-in-out infinite;
+}
+
+@keyframes bolinhaBounce {
+  0% { transform: scale(0.8); }
+  50% { transform: scale(1.12); }
+  100% { transform: scale(1.0); }
+}
+
+.animate-bolinhaBounce {
+  animation: bolinhaBounce 0.5s ease-out;
+}
+
+@keyframes balloonIn {
+  0% { transform: scale(0) translateY(10px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.animate-balloonIn {
+  animation: balloonIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}

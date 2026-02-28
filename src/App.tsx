@@ -10,7 +10,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 // OBS Pages
-import { ObsScoreboard, ObsStats, ObsEvents, ObsPoll, ObsLeagueName, ObsHomeTeam, ObsAwayTeam, ObsScore, ObsMatchTime, ObsPlayerRatings, ObsLineups, ObsStandings, ObsPredictions, ObsH2H, ObsInjuries } from "@/presentation/pages/obs";
+import { ObsScoreboard, ObsStats, ObsEvents, ObsPoll, ObsLeagueName, ObsHomeTeam, ObsAwayTeam, ObsScore, ObsMatchTime, ObsPlayerRatings, ObsLineups, ObsStandings, ObsPredictions, ObsH2H, ObsInjuries, ObsBolinha } from "@/presentation/pages/obs";
 
 // Site Pages
 import { LiveDashboard, JoinUs } from "@/presentation/pages/site";
@@ -82,6 +82,7 @@ const App = () => (
             <Route path={ROUTES.OBS_PREDICTIONS} element={<ObsPredictions />} />
             <Route path={ROUTES.OBS_H2H} element={<ObsH2H />} />
             <Route path={ROUTES.OBS_INJURIES} element={<ObsInjuries />} />
+            <Route path={ROUTES.OBS_BOLINHA} element={<ObsBolinha />} />
 
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />

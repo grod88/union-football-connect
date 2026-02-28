@@ -13,3 +13,4 @@ export { default as ObsStandings } from './ObsStandings';
 export { default as ObsPredictions } from './ObsPredictions';
 export { default as ObsH2H } from './ObsH2H';
 export { default as ObsInjuries } from './ObsInjuries';
+export { default as ObsBolinha } from './ObsBolinha';
