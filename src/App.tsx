@@ -13,7 +13,7 @@ import NotFound from "./pages/NotFound";
 import { ObsScoreboard, ObsStats, ObsEvents, ObsPoll, ObsLeagueName, ObsHomeTeam, ObsAwayTeam, ObsScore, ObsMatchTime, ObsPlayerRatings, ObsLineups, ObsStandings, ObsPredictions, ObsH2H, ObsInjuries, ObsBolinha } from "@/presentation/pages/obs";
 
 // Site Pages
-import { LiveDashboard, JoinUs } from "@/presentation/pages/site";
+import { LiveDashboard, JoinUs, AdminBolinha } from "@/presentation/pages/site";
 import TodayMatches from "@/presentation/pages/site/TodayMatches";
 import PreMatch from "@/presentation/pages/site/PreMatch";
 import StandingsPage from "@/presentation/pages/site/Standings";
@@ -65,6 +65,9 @@ const App = () => (
             <Route path={ROUTES.CALENDAR} element={<CalendarPage />} />
             <Route path={ROUTES.JOIN_US} element={<JoinUs />} />
             <Route path={ROUTES.COMMUNITY} element={<Navigate to={ROUTES.JOIN_US} replace />} />
+
+            {/* Admin Pages */}
+            <Route path={ROUTES.ADMIN_BOLINHA} element={<AdminBolinha />} />
 
             {/* OBS Overlay Pages */}
             <Route path={ROUTES.OBS_SCOREBOARD} element={<ObsScoreboard />} />

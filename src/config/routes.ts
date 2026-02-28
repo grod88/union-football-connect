@@ -20,6 +20,9 @@ export const ROUTES = {
   BLOG_POST: '/blog/:slug',
   PARTNERS: '/parceiros',
 
+  // Admin routes
+  ADMIN_BOLINHA: '/admin/bolinha',
+
   // OBS overlay routes (transparent, no chrome)
   OBS_SCOREBOARD: '/obs/placar',
   OBS_STATS: '/obs/stats',
