@@ -1,30 +1,19 @@
 
 
-## L2 — Edge Function `bolinha-sync-match`
+## L3 — Update `bolinha-comment` to Use Match Context
 
-### What will be done
+### Changes to `supabase/functions/bolinha-comment/index.ts`
 
-1. **Create `supabase/functions/bolinha-sync-match/index.ts`** with the full implementation from the prompt:
-   - Receives `fixture_id` via POST JSON body
-   - Calls `api-football-proxy` in parallel for 6 endpoints: `/fixtures`, `/injuries`, `/predictions`, `/fixtures/lineups`, `/fixtures/statistics`, `/fixtures/events`
-   - After getting team IDs from fixture response, fetches `/fixtures/headtohead` (last 10)
-   - Generates a textual `context_summary` covering: match info, predictions, injuries, H2H, lineups, live stats
-   - Upserts everything into `bolinha_match_context` with `onConflict: 'fixture_id'` and `is_active: true`
-   - Returns a summary JSON with counts and flags
+1. **Move Supabase client creation earlier** — right after parsing the request body, before building the prompt
+2. **Fetch active match context** from `bolinha_match_context` using `.maybeSingle()` (safer than `.single()`)
+3. **Inject `context_summary`** into both `custom_prompt` and event-based prompt paths
+4. **Use `activeMatch` fallbacks** for `team_id` and `fixture_id` when not provided in the request body
+5. **No changes** to `BOLINHA_SYSTEM_PROMPT`, TTS logic, or broadcast logic
 
-2. **Add to `supabase/config.toml`**:
-   ```toml
-   [functions.bolinha-sync-match]
-   verify_jwt = false
-   ```
+### Specific edits
 
-### Implementation details
-
-- Uses `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (both already configured as secrets)
-- Calls the proxy internally via `${supabaseUrl}/functions/v1/api-football-proxy?endpoint=...` — no API key needed client-side
-- H2H fetch is sequential (depends on team IDs from fixture response); the other 6 are parallel
-- The `deactivate_other_matches` trigger automatically deactivates previous matches on upsert
-
-### No database changes needed
-The `bolinha_match_context` table was created in L1.
+- Lines ~68-95 (after body parse, before Claude call): insert Supabase client + context fetch
+- Lines ~96-110 (prompt building): replace with context-enriched versions
+- Lines ~140-150 (db insert + broadcast): use `effectiveTeamId` and `activeMatch?.fixture_id` fallbacks
+- Move the existing Supabase client creation (currently around line 140) up, reuse for both context fetch and db operations
 
