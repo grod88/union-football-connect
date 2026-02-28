@@ -67,6 +67,25 @@ serve(async (req) => {
       generate_audio,
     } = await req.json();
 
+    // Create Supabase client early (reused for context fetch, db insert, broadcast)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Fetch active match context
+    let matchContext = "";
+    const { data: activeMatch } = await supabase
+      .from("bolinha_match_context")
+      .select("context_summary, home_team_name, away_team_name, home_team_id, away_team_id, fixture_id")
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (activeMatch?.context_summary) {
+      matchContext = activeMatch.context_summary;
+    }
+
+    const effectiveTeamId = team_id || activeMatch?.home_team_id || null;
+
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
     if (!ANTHROPIC_API_KEY) {
@@ -76,21 +95,13 @@ serve(async (req) => {
       );
     }
 
-    // Montar o prompt do usuário baseado no contexto
+    // Build user prompt with match context
     let userPrompt = "";
 
     if (custom_prompt) {
-      userPrompt = custom_prompt;
+      userPrompt = `CONTEXTO DA PARTIDA ATUAL:\n${matchContext}\n\n---\n\nINSTRUÇÃO: ${custom_prompt}\n\nUse os dados do contexto acima para enriquecer seu comentário com informações reais. Responda como JSON com "text" e "emotion".`;
     } else {
-      userPrompt = `Evento: ${event_type || "comentário geral"}
-${event_description ? `Descrição: ${event_description}` : ""}
-${team_name ? `Time: ${team_name}` : ""}
-${player_name ? `Jogador: ${player_name}` : ""}
-${minute ? `Minuto: ${minute}'` : ""}
-${score ? `Placar: ${score}` : ""}
-${fixture_context ? `Contexto: ${fixture_context}` : ""}
-
-Responda como JSON com os campos "text" e "emotion".`;
+      userPrompt = `CONTEXTO DA PARTIDA ATUAL:\n${matchContext}\n\n---\n\nEVENTO: ${event_type || "comentário geral"}\n${event_description ? `Descrição: ${event_description}` : ""}\n${team_name ? `Time: ${team_name}` : ""}\n${player_name ? `Jogador: ${player_name}` : ""}\n${minute ? `Minuto: ${minute}'` : ""}\n${score ? `Placar: ${score}` : ""}\n${fixture_context ? `Contexto extra: ${fixture_context}` : ""}\n\nUse os dados do contexto acima para enriquecer seu comentário com informações reais. Responda como JSON com "text" e "emotion".`;
     }
 
     // Chamar Claude API
@@ -149,13 +160,11 @@ Responda como JSON com os campos "text" e "emotion".`;
 
     if (generate_audio !== false) {
       try {
-        const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-        const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
-        const ttsResponse = await fetch(`${SUPABASE_URL}/functions/v1/bolinha-tts`, {
+        const ttsResponse = await fetch(`${supabaseUrl}/functions/v1/bolinha-tts`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY") || ""}`,
           },
           body: JSON.stringify({ text: commentText }),
         });
@@ -170,15 +179,11 @@ Responda como JSON com os campos "text" e "emotion".`;
     }
 
     // Salvar no banco + broadcast via Realtime
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     await supabase.from("bolinha_messages").insert({
-      fixture_id: fixture_id || null,
+      fixture_id: fixture_id || activeMatch?.fixture_id || null,
       text: commentText,
       emotion: emotion,
-      team_id: team_id || null,
+      team_id: effectiveTeamId,
       audio_url: audioBase64 ? "generated" : null,
       event_type: event_type || "manual",
     });
