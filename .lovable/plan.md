@@ -1,18 +1,18 @@
 
 
-## L1 — Tabela bolinha_messages + Realtime
+## L2 — Edge Function bolinha-tts
 
-### Migration SQL
+### Changes
 
-Criar a tabela `bolinha_messages` com:
-- Colunas: `id`, `fixture_id`, `text`, `emotion`, `team_id`, `audio_url`, `event_type`, `created_at`
-- Constraint de emoções válidas via trigger (não CHECK, para evitar problemas de restore)
-- Índice por `fixture_id`
-- Função de limpeza automática (24h)
-- RLS: leitura pública, escrita pública (edge functions usam service_role)
-- Realtime habilitado via `ALTER PUBLICATION`
+1. **Create `supabase/functions/bolinha-tts/index.ts`** with the provided code, but with one fix: replace the `btoa` + spread approach for base64 encoding (causes stack overflow on large buffers) with Deno's `base64Encode` from std library.
 
-### Observação técnica
+2. **Update `supabase/config.toml`** to add `[functions.bolinha-tts]` with `verify_jwt = false`.
 
-Usar validation trigger em vez de CHECK constraint para o campo `emotion`, conforme boas práticas do Supabase (CHECK constraints com valores enum podem causar problemas em restores).
+3. **Deploy** the function (automatic).
+
+### Technical note
+
+The user's provided code uses `btoa(new Uint8Array(...).reduce(...))` which can crash with large audio buffers. Will use `import { encode } from "https://deno.land/std@0.168.0/encoding/base64.ts"` instead. Also updating CORS headers to include all required Supabase client headers.
+
+Secrets `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` are already configured.
 
