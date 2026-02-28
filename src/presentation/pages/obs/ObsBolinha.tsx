@@ -75,7 +75,7 @@ const ObsBolinha = () => {
 
     if (msg.audioBase64) {
       try {
-        const audio = new Audio(`data:audio/mpeg;base64,${msg.audioBase64}`);
+        const audio = new Audio(msg.audioBase64);
         audioRef.current = audio;
         audio.play().catch(() => {});
         audio.onended = () => { audioDuration = 0; };
