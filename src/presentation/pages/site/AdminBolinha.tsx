@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Loader2, Send, Bot, Zap } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Loader2, Send, Bot, Zap, RefreshCw, Eye, Satellite } from 'lucide-react';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -21,18 +23,6 @@ const EMOTIONS = [
 
 const EMOTION_IMAGE = (emotion: string) =>
   `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-${emotion.toUpperCase()}.png`;
-
-const QUICK_ACTIONS = [
-  { icon: '⚽', label: 'GOL!', prompt: 'Acabou de sair um gol! Comemora com energia!' },
-  { icon: '🟨', label: 'Cartão!', prompt: 'Acabou de sair um cartão amarelo polêmico. Comente com sarcasmo.' },
-  { icon: '🔄', label: 'Substituição', prompt: 'O técnico fez uma substituição. Faça um comentário rápido.' },
-  { icon: '😡', label: 'Juiz ladrão!', prompt: 'O juiz errou feio! Lance polêmico absurdo. Fique indignado!' },
-  { icon: '😴', label: 'Jogo chato', prompt: 'O jogo está sem graça, sem emoção, morno. Reclame com humor.' },
-  { icon: '👏', label: 'Golaço!', prompt: 'Que golaço absurdo! Elogie a jogada mesmo se for do adversário.' },
-  { icon: '📊', label: 'Intervalo', prompt: 'É intervalo. Faça um resumo rápido e sarcástico do primeiro tempo.' },
-  { icon: '🏁', label: 'Fim de Jogo', prompt: 'Acabou o jogo! Dê seu veredito final sobre a partida.' },
-  { icon: '👋', label: 'Olá galera!', prompt: 'Cumprimente a galera que está chegando na live. Seja receptivo.' },
-];
 
 const EMOTION_BADGE_COLORS: Record<string, string> = {
   gol: 'bg-green-500',
@@ -51,29 +41,86 @@ interface HistoryMessage {
   event_type: string | null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MatchContext = any;
+
+/* ────────────────────────────── helpers ────────────────────────────── */
+
+function summarizeH2H(h2hData: unknown, homeId: number | null, awayId: number | null) {
+  if (!Array.isArray(h2hData) || h2hData.length === 0) return null;
+  let homeWins = 0, awayWins = 0, draws = 0;
+  for (const match of h2hData) {
+    const hGoals = match?.goals?.home ?? 0;
+    const aGoals = match?.goals?.away ?? 0;
+    const hTeamId = match?.teams?.home?.id;
+    if (hGoals === aGoals) { draws++; continue; }
+    const winnerIsHome = hGoals > aGoals;
+    if ((winnerIsHome && hTeamId === homeId) || (!winnerIsHome && hTeamId !== homeId)) homeWins++;
+    else awayWins++;
+  }
+  return { homeWins, awayWins, draws, total: h2hData.length };
+}
+
+function summarizePredictions(predData: unknown) {
+  if (!predData || typeof predData !== 'object') return null;
+  const pred = predData as Record<string, unknown>;
+  const winner = (pred.predictions as Record<string, unknown>)?.winner as Record<string, unknown> | undefined;
+  if (!winner) return null;
+  return { name: winner.name as string, comment: winner.comment as string };
+}
+
+function summarizeInjuries(injData: unknown) {
+  if (!Array.isArray(injData)) return 0;
+  return injData.length;
+}
+
+/* ════════════════════════════════════════════════════════════════════ */
+
 export default function AdminBolinha() {
-  // Manual mode state
+  // Match context
+  const [fixtureId, setFixtureId] = useState('');
+  const [matchContext, setMatchContext] = useState<MatchContext>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Quick actions
+  const [generateAudio, setGenerateAudio] = useState(true);
+  const [quickLoading, setQuickLoading] = useState<number | null>(null);
+
+  // Manual mode
   const [manualText, setManualText] = useState('');
   const [selectedEmotion, setSelectedEmotion] = useState('neutro');
   const [manualTTS, setManualTTS] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  // AI mode state
+  // AI mode
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiTTS, setAiTTS] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastGenerated, setLastGenerated] = useState('');
 
-  // Quick action loading
-  const [quickLoading, setQuickLoading] = useState<number | null>(null);
-
   // History
   const [history, setHistory] = useState<HistoryMessage[]>([]);
 
-  // Channel ref for manual broadcast
+  // Broadcast channel
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Fetch history
+  /* ── load active match on mount ── */
+  useEffect(() => {
+    const loadActive = async () => {
+      const { data } = await supabase
+        .from('bolinha_match_context')
+        .select('*')
+        .eq('is_active', true)
+        .maybeSingle();
+      if (data) {
+        setMatchContext(data);
+        setFixtureId(String(data.fixture_id));
+      }
+    };
+    loadActive();
+  }, []);
+
+  /* ── history + realtime ── */
   useEffect(() => {
     const fetchHistory = async () => {
       const { data } = await supabase
@@ -85,281 +132,350 @@ export default function AdminBolinha() {
     };
     fetchHistory();
 
-    // Realtime subscription for live updates
     const channel = supabase
       .channel('bolinha-history')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'bolinha_messages' },
-        (payload) => {
-          const newMsg = payload.new as HistoryMessage;
-          setHistory((prev) => [newMsg, ...prev].slice(0, 20));
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bolinha_messages' }, (payload) => {
+        const newMsg = payload.new as HistoryMessage;
+        setHistory((prev) => [newMsg, ...prev].slice(0, 20));
+      })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Setup broadcast channel
+  /* ── broadcast channel ── */
   useEffect(() => {
     channelRef.current = supabase.channel('bolinha');
     channelRef.current.subscribe();
-    return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
-    };
+    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
   }, []);
 
-  // Manual send
+  /* ── sync match ── */
+  const syncMatch = useCallback(async () => {
+    if (!fixtureId.trim()) return;
+    setIsSyncing(true);
+    try {
+      const { data } = await supabase.functions.invoke('bolinha-sync-match', {
+        body: { fixture_id: Number(fixtureId) },
+      });
+      if (data?.success) {
+        const { data: updated } = await supabase
+          .from('bolinha_match_context')
+          .select('*')
+          .eq('fixture_id', Number(fixtureId))
+          .maybeSingle();
+        setMatchContext(updated);
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [fixtureId]);
+
+  /* ── quick actions (context-aware) ── */
+  const homeName = matchContext?.home_team_name || 'Time Casa';
+  const awayName = matchContext?.away_team_name || 'Time Fora';
+  const leagueName = matchContext?.league_name || 'campeonato';
+
+  const quickActions = useMemo(() => [
+    { icon: '👋', label: 'Olá galera!', prompt: `Cumprimente a galera da live do Union Football Live! É dia de ${homeName} x ${awayName} pelo ${leagueName}! Diga que o Bolinha tá pronto pra resenha!` },
+    { icon: '📊', label: 'Pré-jogo', prompt: `Faça uma análise pré-jogo de ${homeName} x ${awayName}. Use os dados de predição, H2H e lesões do contexto. Traga curiosidades e sua opinião sobre quem leva.` },
+    { icon: '🔮', label: 'Predição', prompt: `Dê seu palpite para ${homeName} x ${awayName}. Use os dados de predição e comparação do contexto. Seja opinativo e divertido.` },
+    { icon: '⚽', label: `Gol ${homeName.split(' ')[0]}!`, prompt: `GOL DO ${homeName.toUpperCase()} contra o ${awayName}! Comemora com energia! Use dados do contexto se possível.` },
+    { icon: '⚽', label: `Gol ${awayName.split(' ')[0]}`, prompt: `Gol do ${awayName} contra o ${homeName}. Comente reconhecendo o gol.` },
+    { icon: '🟨', label: 'Cartão!', prompt: `Saiu cartão no jogo ${homeName} x ${awayName}! Comente com sarcasmo sobre a tensão do jogo.` },
+    { icon: '😡', label: 'Juiz errou!', prompt: `O juiz errou feio em ${homeName} x ${awayName}! Lance polêmico! Fique indignado!` },
+    { icon: '👏', label: 'Que jogada!', prompt: `Que jogada linda em ${homeName} x ${awayName}! Elogie a qualidade técnica.` },
+    { icon: '😴', label: 'Jogo parado', prompt: `O jogo ${homeName} x ${awayName} tá sem emoção. Reclame com humor.` },
+    { icon: '📊', label: 'Intervalo', prompt: `É intervalo em ${homeName} x ${awayName} pelo ${leagueName}. Faça um resumo sarcástico do primeiro tempo. Use as estatísticas do contexto.` },
+    { icon: '🏥', label: 'Desfalques', prompt: `Comente sobre os desfalques e lesões no jogo ${homeName} x ${awayName}. Use os dados de lesões do contexto para falar de jogadores específicos.` },
+    { icon: '🏁', label: 'Fim de jogo!', prompt: `Acabou ${homeName} x ${awayName} pelo ${leagueName}! Dê seu veredito final. Use as estatísticas para embasar.` },
+  ], [homeName, awayName, leagueName]);
+
+  /* ── handlers ── */
+  const handleQuickAction = useCallback(async (idx: number) => {
+    setQuickLoading(idx);
+    try {
+      const res = await supabase.functions.invoke('bolinha-comment', {
+        body: { custom_prompt: quickActions[idx].prompt, generate_audio: generateAudio },
+      });
+      setLastGenerated(res.data?.text || '');
+    } catch (e) {
+      console.error('Quick action error:', e);
+    } finally {
+      setQuickLoading(null);
+    }
+  }, [quickActions, generateAudio]);
+
   const sendManual = useCallback(async () => {
     if (!manualText.trim()) return;
     setIsSending(true);
     try {
       let audioBase64: string | null = null;
-
       if (manualTTS) {
-        const res = await supabase.functions.invoke('bolinha-tts', {
-          body: { text: manualText },
-        });
+        const res = await supabase.functions.invoke('bolinha-tts', { body: { text: manualText } });
         audioBase64 = res.data?.audioBase64 || null;
       }
-
-      // Broadcast
       await channelRef.current?.send({
-        type: 'broadcast',
-        event: 'comment',
+        type: 'broadcast', event: 'comment',
         payload: { text: manualText, emotion: selectedEmotion, teamId: null, audioBase64 },
       });
-
-      // Persist
       await supabase.from('bolinha_messages').insert({
-        text: manualText,
-        emotion: selectedEmotion,
-        event_type: 'manual',
+        text: manualText, emotion: selectedEmotion, event_type: 'manual',
       });
-
       setManualText('');
-    } catch (e) {
-      console.error('Manual send error:', e);
-    } finally {
-      setIsSending(false);
-    }
+    } catch (e) { console.error('Manual send error:', e); }
+    finally { setIsSending(false); }
   }, [manualText, selectedEmotion, manualTTS]);
 
-  // AI send
-  const sendAI = useCallback(async (prompt: string, withAudio: boolean, quickIdx?: number) => {
-    if (!prompt.trim()) return;
-    if (quickIdx !== undefined) setQuickLoading(quickIdx);
-    else setIsGenerating(true);
-
+  const sendAI = useCallback(async () => {
+    if (!aiPrompt.trim()) return;
+    setIsGenerating(true);
     try {
       const res = await supabase.functions.invoke('bolinha-comment', {
-        body: { custom_prompt: prompt, generate_audio: withAudio },
+        body: { custom_prompt: aiPrompt, generate_audio: aiTTS },
       });
       setLastGenerated(res.data?.text || 'Erro ao gerar');
-    } catch (e) {
-      console.error('AI send error:', e);
-      setLastGenerated('Erro ao gerar');
-    } finally {
-      setIsGenerating(false);
-      setQuickLoading(null);
-    }
-  }, []);
+    } catch (e) { console.error('AI error:', e); setLastGenerated('Erro ao gerar'); }
+    finally { setIsGenerating(false); }
+  }, [aiPrompt, aiTTS]);
 
   const formatTime = (ts: string | null) => {
     if (!ts) return '--:--';
     return new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  /* ── derived match data ── */
+  const h2h = useMemo(() => summarizeH2H(matchContext?.h2h_data, matchContext?.home_team_id, matchContext?.away_team_id), [matchContext]);
+  const prediction = useMemo(() => summarizePredictions(matchContext?.predictions_data), [matchContext]);
+  const injuryCount = useMemo(() => summarizeInjuries(matchContext?.injuries_data), [matchContext]);
+  const hasLineups = useMemo(() => Array.isArray(matchContext?.lineups_data) && matchContext.lineups_data.length > 0, [matchContext]);
+
+  /* ════════════════════════════════ RENDER ════════════════════════════════ */
+
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 md:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+      <div className="max-w-5xl mx-auto space-y-6">
+
+        <h1 className="text-2xl font-bold flex items-center gap-2 font-['Oswald']">
           🎮 BOLINHA — PAINEL DE CONTROLE
         </h1>
 
-        {/* Manual Mode */}
-        <Card className="bg-gray-900 border-gray-800">
+        {/* ═══════ 1. PARTIDA ATIVA ═══════ */}
+        <Card className="bg-gray-900 border-gray-800 border-l-4 border-l-yellow-500">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-white flex items-center gap-2">
-              <Send className="w-5 h-5" /> MODO MANUAL
+            <CardTitle className="text-lg text-white flex items-center gap-2 font-['Oswald']">
+              <Satellite className="w-5 h-5 text-yellow-500" /> PARTIDA ATIVA
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Textarea
-              placeholder="Digite o texto do Bolinha..."
-              value={manualText}
-              onChange={(e) => setManualText(e.target.value)}
-              className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 min-h-[80px]"
-            />
-
-            {/* Emotion selector */}
-            <div>
-              <Label className="text-gray-400 text-sm mb-2 block">Emoção:</Label>
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                {EMOTIONS.map((e) => (
-                  <button
-                    key={e.key}
-                    onClick={() => setSelectedEmotion(e.key)}
-                    className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
-                      selectedEmotion === e.key
-                        ? 'ring-2 ring-yellow-500 bg-yellow-500/10 border-yellow-500'
-                        : 'border-gray-700 hover:border-gray-500'
-                    }`}
-                  >
-                    <img src={EMOTION_IMAGE(e.key)} alt={e.label} className="w-12 h-12 object-contain" />
-                    <span className="text-xs text-gray-300">{e.emoji} {e.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="manual-tts"
-                  checked={manualTTS}
-                  onCheckedChange={(c) => setManualTTS(!!c)}
-                />
-                <Label htmlFor="manual-tts" className="text-gray-400 text-sm cursor-pointer">
-                  Gerar áudio (TTS)
-                </Label>
-              </div>
-
-              <Button
-                onClick={sendManual}
-                disabled={isSending || !manualText.trim()}
-                className="bg-yellow-500 text-black font-bold hover:bg-yellow-400 px-6"
-              >
-                {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                ENVIAR
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* AI Mode */}
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-white flex items-center gap-2">
-              <Bot className="w-5 h-5" /> MODO IA
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              placeholder="Ex: Comenta sobre o gol do Calleri aos 32 minutos"
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 min-h-[80px]"
-            />
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="ai-tts"
-                  checked={aiTTS}
-                  onCheckedChange={(c) => setAiTTS(!!c)}
-                />
-                <Label htmlFor="ai-tts" className="text-gray-400 text-sm cursor-pointer">
-                  Gerar áudio (TTS)
-                </Label>
-              </div>
-
-              <Button
-                onClick={() => sendAI(aiPrompt, aiTTS)}
-                disabled={isGenerating || !aiPrompt.trim()}
-                className="bg-purple-600 text-white font-bold hover:bg-purple-500 px-6"
-              >
-                {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
-                GERAR COM IA + ENVIAR
+            {/* Fixture ID input + sync */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Fixture ID (ex: 1526432)"
+                value={fixtureId}
+                onChange={(e) => setFixtureId(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 max-w-[200px]"
+              />
+              <Button onClick={syncMatch} disabled={isSyncing || !fixtureId.trim()} className="bg-blue-600 hover:bg-blue-700 text-white font-bold">
+                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                SINCRONIZAR
               </Button>
             </div>
 
-            {lastGenerated && (
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-gray-300">
-                <span className="text-gray-500 text-xs block mb-1">Último gerado:</span>
-                {lastGenerated}
+            {/* Match info card */}
+            {matchContext && (
+              <div className="bg-gray-800/50 rounded-lg p-4 space-y-2 text-sm">
+                <p className="text-lg font-bold text-white font-['Oswald']">
+                  ✅ {matchContext.home_team_name} vs {matchContext.away_team_name}
+                </p>
+                <p className="text-gray-400">
+                  {matchContext.league_name} — {matchContext.league_round}
+                </p>
+                {matchContext.venue_name && (
+                  <p className="text-gray-400">{matchContext.venue_name} — {matchContext.match_date ? new Date(matchContext.match_date).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</p>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-gray-300 pt-2 border-t border-gray-700">
+                  {prediction && (
+                    <p>📊 Predição: <span className="text-white">{prediction.name}</span> {prediction.comment && <span className="text-gray-500">({prediction.comment})</span>}</p>
+                  )}
+                  <p>🏥 Lesões: <span className="text-white">{injuryCount} jogadores</span></p>
+                  {h2h && (
+                    <p>⚔️ H2H: <span className="text-white">{h2h.homeWins}V {homeName.split(' ')[0]}, {h2h.awayWins}V {awayName.split(' ')[0]}, {h2h.draws}E</span> <span className="text-gray-500">(últimos {h2h.total})</span></p>
+                  )}
+                  <p>📋 Escalações: {hasLineups ? <span className="text-green-400">✅ disponíveis</span> : <span className="text-gray-500">❌ indisponíveis</span>}</p>
+                  <p className="text-gray-500">Último sync: {formatTime(matchContext.last_synced_at)}</p>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button onClick={syncMatch} disabled={isSyncing} variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-700">
+                    <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} /> Atualizar dados
+                  </Button>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-700">
+                        <Eye className="w-3 h-3" /> Ver contexto completo
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-3xl max-h-[80vh] bg-gray-900 border-gray-700 text-white">
+                      <DialogHeader>
+                        <DialogTitle className="text-white">Contexto completo da partida</DialogTitle>
+                      </DialogHeader>
+                      <pre className="text-xs text-gray-300 whitespace-pre-wrap overflow-y-auto max-h-[60vh] font-mono bg-gray-950 p-4 rounded-lg">
+                        {matchContext.context_summary || 'Sem contexto gerado.'}
+                      </pre>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
+            )}
+
+            {!matchContext && !isSyncing && (
+              <p className="text-gray-500 text-sm">Nenhuma partida ativa. Insira um Fixture ID e sincronize.</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
+        {/* ═══════ 2. ATALHOS RÁPIDOS ═══════ */}
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-white flex items-center gap-2">
-              <Zap className="w-5 h-5" /> ATALHOS RÁPIDOS
+            <CardTitle className="text-lg text-white flex items-center gap-2 font-['Oswald']">
+              <Zap className="w-5 h-5 text-yellow-500" /> ATALHOS RÁPIDOS
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-2">
-              {QUICK_ACTIONS.map((action, idx) => (
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Checkbox id="quick-tts" checked={generateAudio} onCheckedChange={(c) => setGenerateAudio(!!c)} />
+              <Label htmlFor="quick-tts" className="text-gray-400 text-sm cursor-pointer">🔊 Gerar com áudio (TTS)</Label>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {quickActions.map((action, idx) => (
                 <button
                   key={idx}
-                  onClick={() => sendAI(action.prompt, true, idx)}
+                  onClick={() => handleQuickAction(idx)}
                   disabled={quickLoading !== null}
-                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-3 text-sm text-center transition-colors disabled:opacity-50"
+                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-yellow-500/50 rounded-lg p-3 text-center transition-all duration-200 disabled:opacity-50 relative"
                 >
                   {quickLoading === idx ? (
-                    <Loader2 className="w-5 h-5 animate-spin mx-auto mb-1" />
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-yellow-500" />
                   ) : (
                     <span className="text-xl block mb-1">{action.icon}</span>
                   )}
-                  <span className="text-gray-300">{action.label}</span>
+                  <span className="text-gray-300 text-xs">{action.label}</span>
                 </button>
               ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* Preview */}
+        {/* ═══════ 3. MODO LIVRE ═══════ */}
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-white">👁️ PREVIEW AO VIVO</CardTitle>
+            <CardTitle className="text-lg text-white font-['Oswald']">💬 MODO LIVRE</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="bg-gray-950 border-2 border-gray-700 rounded-lg overflow-hidden w-full max-w-sm h-80 mx-auto">
-              <iframe
-                src="/obs/bolinha?size=sm"
-                title="Bolinha Preview"
-                className="w-full h-full border-0"
-                style={{ background: 'transparent' }}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Manual */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-gray-400 flex items-center gap-1"><Send className="w-4 h-4" /> Manual</h3>
+                <Textarea
+                  placeholder="Texto do Bolinha..."
+                  value={manualText}
+                  onChange={(e) => setManualText(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 min-h-[70px]"
+                />
+                <div className="grid grid-cols-3 gap-1">
+                  {EMOTIONS.map((e) => (
+                    <button
+                      key={e.key}
+                      onClick={() => setSelectedEmotion(e.key)}
+                      className={`flex items-center gap-1 p-1.5 rounded border text-xs transition-all ${
+                        selectedEmotion === e.key
+                          ? 'ring-2 ring-yellow-500 bg-yellow-500/10 border-yellow-500'
+                          : 'border-gray-700 hover:border-gray-500'
+                      }`}
+                    >
+                      <img src={EMOTION_IMAGE(e.key)} alt={e.label} className="w-8 h-8 object-contain" />
+                      <span className="text-gray-300">{e.emoji} {e.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="manual-tts" checked={manualTTS} onCheckedChange={(c) => setManualTTS(!!c)} />
+                    <Label htmlFor="manual-tts" className="text-gray-400 text-xs cursor-pointer">TTS</Label>
+                  </div>
+                  <Button onClick={sendManual} disabled={isSending || !manualText.trim()} className="bg-yellow-500 text-black font-bold hover:bg-yellow-400 px-4" size="sm">
+                    {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} ENVIAR
+                  </Button>
+                </div>
+              </div>
+
+              {/* IA */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-gray-400 flex items-center gap-1"><Bot className="w-4 h-4" /> IA</h3>
+                <Textarea
+                  placeholder="Ex: Comenta sobre o gol do Calleri..."
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 min-h-[70px]"
+                />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="ai-tts" checked={aiTTS} onCheckedChange={(c) => setAiTTS(!!c)} />
+                    <Label htmlFor="ai-tts" className="text-gray-400 text-xs cursor-pointer">TTS</Label>
+                  </div>
+                  <Button onClick={sendAI} disabled={isGenerating || !aiPrompt.trim()} className="bg-purple-600 text-white font-bold hover:bg-purple-500 px-4" size="sm">
+                    {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />} GERAR COM IA
+                  </Button>
+                </div>
+                {lastGenerated && (
+                  <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-gray-300">
+                    <span className="text-gray-500 block mb-1">Último gerado:</span>
+                    {lastGenerated}
+                  </div>
+                )}
+              </div>
             </div>
-            <p className="text-center text-gray-500 text-xs mt-2">
-              O que aparecer aqui é EXATAMENTE o que aparece no OBS
-            </p>
           </CardContent>
         </Card>
 
-        {/* History */}
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-white">📜 HISTÓRICO RECENTE</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {history.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-4">Nenhuma mensagem ainda.</p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {history.map((msg) => (
-                  <div key={msg.id} className="flex items-center gap-3 text-sm border-b border-gray-800 pb-2">
-                    <span className="text-gray-500 font-mono text-xs whitespace-nowrap">
-                      {formatTime(msg.created_at)}
-                    </span>
-                    <Badge className={`${EMOTION_BADGE_COLORS[msg.emotion] || 'bg-gray-600'} text-white text-xs px-2 py-0`}>
-                      {msg.emotion}
-                    </Badge>
-                    <span className="text-gray-300 truncate">{msg.text}</span>
-                  </div>
-                ))}
+        {/* ═══════ 4. PREVIEW + HISTÓRICO ═══════ */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Preview */}
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-white">👁️ PREVIEW</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-gray-950 border-2 border-gray-700 rounded-lg overflow-hidden w-full max-w-xs h-72 mx-auto">
+                <iframe src="/obs/bolinha?size=sm" title="Bolinha Preview" className="w-full h-full border-0" style={{ background: 'transparent' }} />
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* History */}
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-white">📜 HISTÓRICO</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {history.length === 0 ? (
+                <p className="text-gray-500 text-sm text-center py-4">Nenhuma mensagem ainda.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                  {history.map((msg) => (
+                    <div key={msg.id} className="flex items-center gap-2 text-xs border-b border-gray-800 pb-1.5">
+                      <span className="text-gray-500 font-mono whitespace-nowrap">{formatTime(msg.created_at)}</span>
+                      <Badge className={`${EMOTION_BADGE_COLORS[msg.emotion] || 'bg-gray-600'} text-white text-[10px] px-1.5 py-0`}>{msg.emotion}</Badge>
+                      <span className="text-gray-300 truncate">{msg.text}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
