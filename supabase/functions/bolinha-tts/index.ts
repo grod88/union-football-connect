@@ -48,11 +48,12 @@ serve(async (req) => {
           text: trimmedText,
           model_id: "eleven_flash_v2_5",
           voice_settings: {
-            stability: 0.4,
-            similarity_boost: 0.85,
-            style: 0.8,
+            stability: 0.30,
+            similarity_boost: 0.65,
+            style: 0.45,
             use_speaker_boost: true,
           },
+          speed: 0.95,
         }),
       }
     );
