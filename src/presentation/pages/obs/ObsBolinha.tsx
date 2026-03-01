@@ -6,12 +6,12 @@ import { OBSLayout } from '@/presentation/components/layout/OBSLayout';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 const EMOTION_IMAGES: Record<string, string> = {
-  neutro: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-NEUTRO.png`,
-  gol: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-GOL.png`,
-  bravo: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-BRAVO.png`,
-  analise: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-ANALISE.png`,
-  sarcastico: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-SARCASTICO.png`,
-  tedio: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-TEDIO.png`,
+  neutro: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-NEUTRO-preview.png`,
+  gol: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-GOL-preview.png`,
+  bravo: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-BRAVO-preview.png`,
+  analise: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-ANALISE-preview.png`,
+  sarcastico: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-SARCASTICO-preview.png`,
+  tedio: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-TEDIO-preview.png`,
 };
 
 interface BolinhaMessage {
@@ -22,23 +22,61 @@ interface BolinhaMessage {
   timestamp?: string;
 }
 
-const SIZE_MAP: Record<string, string> = { sm: '140px', md: '200px', lg: '280px' };
+const SIZE_MAP: Record<string, string> = { sm: '200px', md: '300px', lg: '400px' };
 
+const EMOTION_ANIM_MAP: Record<string, string> = {
+  gol: 'bolinha-emotion-gol',
+  bravo: 'bolinha-emotion-bravo',
+  tedio: 'bolinha-emotion-tedio',
+  sarcastico: 'bolinha-emotion-sarcastico',
+  analise: 'bolinha-emotion-analise',
+  neutro: 'bolinha-idle',
+};
+
+/* ── Typewriter sub-component ── */
+function TypewriterText({ text, speed = 30 }: { text: string; speed?: number }) {
+  const [displayed, setDisplayed] = useState('');
+  const done = displayed.length === text.length;
+
+  useEffect(() => {
+    setDisplayed('');
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i < text.length) {
+        setDisplayed(text.substring(0, i + 1));
+        i++;
+      } else {
+        clearInterval(timer);
+      }
+    }, speed);
+    return () => clearInterval(timer);
+  }, [text, speed]);
+
+  return (
+    <>
+      {displayed}
+      {!done && <span className="typewriter-cursor">|</span>}
+    </>
+  );
+}
+
+/* ── Main component ── */
 const ObsBolinha = () => {
   const [searchParams] = useSearchParams();
   const size = searchParams.get('size') || 'md';
-  const bolinhaSize = SIZE_MAP[size] || '200px';
+  const bolinhaSize = SIZE_MAP[size] || '300px';
 
   const [currentEmotion, setCurrentEmotion] = useState('neutro');
   const [messageText, setMessageText] = useState('');
   const [isShowingMessage, setIsShowingMessage] = useState(false);
-  const [isBouncing, setIsBouncing] = useState(false);
-  const [isBalloonFading, setIsBalloonFading] = useState(false);
+  const [animClass, setAnimClass] = useState('bolinha-idle');
+  const [balloonClass, setBalloonClass] = useState('balloon-enter');
 
   const dismissTimerRef = useRef<number | null>(null);
+  const enterTimerRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Preload all images
+  // Preload images
   useEffect(() => {
     Object.values(EMOTION_IMAGES).forEach((src) => {
       const img = new Image();
@@ -47,51 +85,54 @@ const ObsBolinha = () => {
   }, []);
 
   const resetToIdle = useCallback(() => {
-    setIsBalloonFading(true);
+    setBalloonClass('balloon-exit');
     setTimeout(() => {
       setIsShowingMessage(false);
       setMessageText('');
-      setIsBalloonFading(false);
+      setBalloonClass('balloon-enter');
       setCurrentEmotion('neutro');
+      setAnimClass('bolinha-idle');
     }, 500);
   }, []);
 
   const handleNewMessage = useCallback((msg: BolinhaMessage) => {
-    // Clear any pending timer
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
 
-    setIsBalloonFading(false);
+    // 1. Entry animation
     setCurrentEmotion(msg.emotion || 'neutro');
     setMessageText(msg.text);
     setIsShowingMessage(true);
-    setIsBouncing(true);
-    setTimeout(() => setIsBouncing(false), 500);
+    setBalloonClass('balloon-enter');
+    setAnimClass('bolinha-enter');
 
-    let audioDuration = 0;
+    // 2. After entry → emotion-specific animation
+    enterTimerRef.current = window.setTimeout(() => {
+      setAnimClass(EMOTION_ANIM_MAP[msg.emotion] || 'bolinha-idle');
+    }, 600);
 
+    // Audio handling
     if (msg.audioBase64) {
       try {
         const audio = new Audio(msg.audioBase64);
         audioRef.current = audio;
         audio.play().catch(() => {});
-        audio.onended = () => { audioDuration = 0; };
-        // estimate duration — we'll use the longer of 8s or audio
         audio.onloadedmetadata = () => {
-          audioDuration = (audio.duration || 0) * 1000;
+          const audioDuration = (audio.duration || 0) * 1000;
           const delay = Math.max(8000, audioDuration + 500);
           if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
           dismissTimerRef.current = window.setTimeout(resetToIdle, delay);
         };
       } catch {
-        // audio failed, fall through to default timer
+        // fall through to default timer
       }
     }
 
-    // Default 8s timer (overridden above if audio is longer)
+    // Default 8s dismiss
     dismissTimerRef.current = window.setTimeout(resetToIdle, 8000);
   }, [resetToIdle]);
 
@@ -107,21 +148,26 @@ const ObsBolinha = () => {
     return () => {
       supabase.removeChannel(channel);
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+      if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
     };
   }, [handleNewMessage]);
 
+  const activeFilter = isShowingMessage
+    ? 'drop-shadow(0 8px 25px rgba(212,175,55,0.3)) drop-shadow(0 4px 12px rgba(0,0,0,0.5))'
+    : 'drop-shadow(0 8px 20px rgba(0,0,0,0.5))';
+
   return (
-    <OBSLayout className="flex items-end justify-center p-4">
+    <OBSLayout className="flex items-end justify-center pb-2.5">
       <div className="relative flex flex-col items-center">
         {/* Speech balloon */}
         {isShowingMessage && messageText && (
-          <div
-            className={`mb-3 transition-opacity duration-500 ${isBalloonFading ? 'opacity-0' : 'animate-balloonIn'}`}
-            style={{ maxWidth: '320px' }}
-          >
+          <div className={`mb-3 ${balloonClass}`} style={{ maxWidth: '420px' }}>
             <div className="rounded-xl bg-white px-4 py-3 text-center shadow-lg">
-              <p className="font-heading text-sm font-semibold leading-snug text-gray-900 md:text-base">
-                {messageText}
+              <p
+                className="font-heading font-semibold leading-snug text-gray-900"
+                style={{ fontSize: '19px' }}
+              >
+                <TypewriterText text={messageText} speed={30} />
               </p>
             </div>
             {/* Triangle pointer */}
@@ -142,8 +188,14 @@ const ObsBolinha = () => {
         <img
           src={EMOTION_IMAGES[currentEmotion] || EMOTION_IMAGES.neutro}
           alt={`Bolinha ${currentEmotion}`}
-          className={`object-contain ${isBouncing ? 'animate-bolinhaBounce' : ''} ${!isShowingMessage ? 'animate-bolinhaFloat' : ''}`}
-          style={{ width: bolinhaSize, height: bolinhaSize }}
+          className={animClass}
+          style={{
+            width: bolinhaSize,
+            height: bolinhaSize,
+            objectFit: 'contain',
+            filter: activeFilter,
+            transition: 'filter 0.3s ease',
+          }}
         />
       </div>
     </OBSLayout>
