@@ -33,7 +33,9 @@ export type Database = {
           league_name: string | null
           league_round: string | null
           lineups_data: Json | null
+          live_summary: string | null
           match_date: string | null
+          pre_match_summary: string | null
           predictions_data: Json | null
           statistics_data: Json | null
           venue_name: string | null
@@ -56,7 +58,9 @@ export type Database = {
           league_name?: string | null
           league_round?: string | null
           lineups_data?: Json | null
+          live_summary?: string | null
           match_date?: string | null
+          pre_match_summary?: string | null
           predictions_data?: Json | null
           statistics_data?: Json | null
           venue_name?: string | null
@@ -79,7 +83,9 @@ export type Database = {
           league_name?: string | null
           league_round?: string | null
           lineups_data?: Json | null
+          live_summary?: string | null
           match_date?: string | null
+          pre_match_summary?: string | null
           predictions_data?: Json | null
           statistics_data?: Json | null
           venue_name?: string | null
