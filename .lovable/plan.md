@@ -1,35 +1,40 @@
 
 
-## Root Cause
+## Problem Analysis
 
-The `deactivate_other_matches` trigger filters by `id != NEW.id`. During an upsert:
-1. PostgreSQL attempts an INSERT with a **new generated UUID** as `NEW.id`
-2. The BEFORE INSERT trigger fires and runs `UPDATE ... WHERE id != NEW.id AND is_active = true`
-3. Since the new UUID differs from the existing row's `id`, the trigger **updates the existing row** for the same fixture (setting `is_active = false`)
-4. The INSERT then conflicts on `fixture_id`, so `ON CONFLICT DO UPDATE` tries to update that **same existing row** again
-5. PostgreSQL throws: "cannot affect row a second time"
+Two issues found:
 
-The `pg_trigger_depth()` fix only prevents recursion — it doesn't prevent this same-row double-touch.
+### 1. Edge function broadcast doesn't reach OBS
+The `bolinha-comment` edge function (used by AI/quick action buttons) creates a Supabase channel and calls `.send()` **without subscribing first**. Supabase Realtime requires the channel to be subscribed before broadcasting. This means:
+- **Manual sends** from admin work (admin subscribes to the channel on mount, line 153-154)
+- **AI/quick action sends** via the edge function silently fail to broadcast — the message is saved to DB but never reaches the OBS widget
+
+### 2. OBS relies solely on broadcast (fragile)
+The OBS widget only listens for broadcast messages. If a broadcast is missed (network hiccup, race condition), the subtitle is lost forever.
 
 ## Fix
 
-Change the trigger to filter by `fixture_id` instead of `id`:
+### A. Fix edge function broadcast (`supabase/functions/bolinha-comment/index.ts`)
+Subscribe to the channel before sending, then clean up:
 
-```sql
-CREATE OR REPLACE FUNCTION public.deactivate_other_matches()
-  RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.is_active = true AND pg_trigger_depth() = 1 THEN
-    UPDATE public.bolinha_match_context 
-    SET is_active = false 
-    WHERE fixture_id != NEW.fixture_id AND is_active = true;
-  END IF;
-  RETURN NEW;
-END;
-$$;
+```typescript
+// Current (broken):
+await supabase.channel("bolinha").send({ ... });
+
+// Fixed:
+const channel = supabase.channel("bolinha");
+await channel.subscribe();
+await channel.send({ type: "broadcast", event: "comment", payload: { ... } });
+await supabase.removeChannel(channel);
 ```
 
-This ensures the trigger never touches the row being upserted, regardless of whether the `id` matches.
+### B. Add fallback listener in OBS (`src/presentation/pages/obs/ObsBolinha.tsx`)
+Subscribe to **both** broadcast AND `postgres_changes` on `bolinha_messages`. If a broadcast is missed, the DB insert still triggers the widget. The DB row doesn't have `audioBase64` inline, so the OBS will play without audio in the fallback case — but the subtitle and emotion will still appear.
 
-**One migration, no code changes needed.**
+Add a dedup mechanism (track last processed message ID) so the same message isn't played twice when both broadcast and DB trigger fire.
+
+### C. Deploy the edge function
+Redeploy `bolinha-comment` after the fix.
+
+**Files changed**: `supabase/functions/bolinha-comment/index.ts`, `src/presentation/pages/obs/ObsBolinha.tsx`
 
