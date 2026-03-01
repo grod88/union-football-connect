@@ -85,6 +85,7 @@ const ObsBolinha = () => {
   const blockIntervalRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastProcessedRef = useRef<string | null>(null);
+  const broadcastReceivedRef = useRef<number>(0);
 
   // Preload images
   useEffect(() => {
@@ -201,15 +202,18 @@ const ObsBolinha = () => {
   // Subscribe to Realtime
   useEffect(() => {
     const channel = supabase
-      .channel('bolinha-obs')
+      .channel('bolinha')
       .on('broadcast', { event: 'comment' }, (payload) => {
         const msg = payload.payload as BolinhaMessage;
+        broadcastReceivedRef.current = Date.now();
         handleNewMessage(msg, msg.timestamp || msg.text);
       })
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'bolinha_messages' },
         (payload) => {
+          // Skip DB fallback if broadcast arrived recently (has audio)
+          if (Date.now() - broadcastReceivedRef.current < 5000) return;
           const row = payload.new as { id: string; text: string; emotion: string; team_id?: number };
           handleNewMessage(
             { text: row.text, emotion: row.emotion, teamId: row.team_id },
