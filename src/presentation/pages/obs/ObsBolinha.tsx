@@ -232,10 +232,8 @@ const ObsBolinha = () => {
                 className="font-heading font-bold leading-snug text-white"
                 style={{
                   fontSize: '22px',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
+                  wordWrap: 'break-word',
+                  overflowWrap: 'break-word',
                 }}
               >
                 {currentSubtitle}
