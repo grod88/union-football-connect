@@ -233,7 +233,16 @@ serve(async (req) => {
       event_type: event_type || "manual",
     });
 
-    await supabase.channel("bolinha").send({
+    // Subscribe before sending (required for server-side broadcast)
+    const channel = supabase.channel("bolinha");
+    await new Promise<void>((resolve) => {
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") resolve();
+      });
+      // Safety timeout
+      setTimeout(resolve, 3000);
+    });
+    await channel.send({
       type: "broadcast",
       event: "comment",
       payload: {
@@ -244,6 +253,7 @@ serve(async (req) => {
         timestamp: new Date().toISOString(),
       },
     });
+    await supabase.removeChannel(channel);
 
     return new Response(
       JSON.stringify({
