@@ -84,6 +84,7 @@ const ObsBolinha = () => {
   const enterTimerRef = useRef<number | null>(null);
   const blockIntervalRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lastProcessedRef = useRef<string | null>(null);
 
   // Preload images
   useEffect(() => {
@@ -127,7 +128,12 @@ const ObsBolinha = () => {
     }, timePerBlock);
   }, []);
 
-  const handleNewMessage = useCallback((msg: BolinhaMessage) => {
+  const handleNewMessage = useCallback((msg: BolinhaMessage, dedupKey?: string) => {
+    // Dedup: skip if we already processed this message
+    const key = dedupKey || msg.text + (msg.timestamp || '');
+    if (lastProcessedRef.current === key) return;
+    lastProcessedRef.current = key;
+
     // Clear everything from previous message
     clearAllTimers();
     if (audioRef.current) {
@@ -163,7 +169,6 @@ const ObsBolinha = () => {
         });
 
         audio.play().then(() => {
-          // Audio playing — cycle subtitles based on audio duration when available
           if (audio.duration && isFinite(audio.duration)) {
             const timePerBlock = Math.max(2000, (audio.duration * 1000) / blocks.length);
             startSubtitleCycle(blocks, timePerBlock);
@@ -172,17 +177,14 @@ const ObsBolinha = () => {
               const timePerBlock = Math.max(2000, (audio.duration * 1000) / blocks.length);
               startSubtitleCycle(blocks, timePerBlock);
             }, { once: true });
-            // Fallback if metadata never loads
             startSubtitleCycle(blocks, 3000);
           }
         }).catch(() => {
-          // Autoplay blocked — use timer-based fallback
           startSubtitleCycle(blocks, 3000);
           const totalDuration = blocks.length * 3000 + 1000;
           messageTimerRef.current = window.setTimeout(resetBolinha, totalDuration);
         });
 
-        // Safety fallback — 30s max
         messageTimerRef.current = window.setTimeout(resetBolinha, 30000);
       } catch {
         startSubtitleCycle(blocks, 3000);
@@ -190,7 +192,6 @@ const ObsBolinha = () => {
         messageTimerRef.current = window.setTimeout(resetBolinha, totalDuration);
       }
     } else {
-      // No audio — timer based on block count
       startSubtitleCycle(blocks, 3000);
       const totalDuration = blocks.length * 3000 + 1000;
       messageTimerRef.current = window.setTimeout(resetBolinha, totalDuration);
@@ -200,10 +201,22 @@ const ObsBolinha = () => {
   // Subscribe to Realtime
   useEffect(() => {
     const channel = supabase
-      .channel('bolinha')
+      .channel('bolinha-obs')
       .on('broadcast', { event: 'comment' }, (payload) => {
-        handleNewMessage(payload.payload as BolinhaMessage);
+        const msg = payload.payload as BolinhaMessage;
+        handleNewMessage(msg, msg.timestamp || msg.text);
       })
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'bolinha_messages' },
+        (payload) => {
+          const row = payload.new as { id: string; text: string; emotion: string; team_id?: number };
+          handleNewMessage(
+            { text: row.text, emotion: row.emotion, teamId: row.team_id },
+            row.id
+          );
+        }
+      )
       .subscribe();
 
     return () => {
