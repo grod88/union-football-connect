@@ -33,31 +33,37 @@ const EMOTION_ANIM_MAP: Record<string, string> = {
   neutro: 'bolinha-idle',
 };
 
-/* ── Typewriter sub-component ── */
-function TypewriterText({ text, speed = 30 }: { text: string; speed?: number }) {
-  const [displayed, setDisplayed] = useState('');
-  const done = displayed.length === text.length;
+/* ── Split text into cinema-style subtitle blocks ── */
+function splitIntoSubtitles(text: string, maxCharsPerBlock = 80): string[] {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  const blocks: string[] = [];
+  let current = '';
 
-  useEffect(() => {
-    setDisplayed('');
-    let i = 0;
-    const timer = setInterval(() => {
-      if (i < text.length) {
-        setDisplayed(text.substring(0, i + 1));
-        i++;
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim();
+    if ((current + ' ' + trimmed).trim().length <= maxCharsPerBlock) {
+      current = (current + ' ' + trimmed).trim();
+    } else {
+      if (current) blocks.push(current);
+      if (trimmed.length > maxCharsPerBlock) {
+        const words = trimmed.split(' ');
+        let chunk = '';
+        for (const word of words) {
+          if ((chunk + ' ' + word).trim().length <= maxCharsPerBlock) {
+            chunk = (chunk + ' ' + word).trim();
+          } else {
+            if (chunk) blocks.push(chunk);
+            chunk = word;
+          }
+        }
+        current = chunk || '';
       } else {
-        clearInterval(timer);
+        current = trimmed;
       }
-    }, speed);
-    return () => clearInterval(timer);
-  }, [text, speed]);
-
-  return (
-    <>
-      {displayed}
-      {!done && <span className="typewriter-cursor">|</span>}
-    </>
-  );
+    }
+  }
+  if (current) blocks.push(current);
+  return blocks.length > 0 ? blocks : [text.substring(0, maxCharsPerBlock)];
 }
 
 /* ── Main component ── */
@@ -67,13 +73,16 @@ const ObsBolinha = () => {
   const bolinhaSize = SIZE_MAP[size] || '300px';
 
   const [currentEmotion, setCurrentEmotion] = useState('neutro');
-  const [messageText, setMessageText] = useState('');
-  const [isShowingMessage, setIsShowingMessage] = useState(false);
   const [animClass, setAnimClass] = useState('bolinha-idle');
-  const [balloonClass, setBalloonClass] = useState('balloon-enter');
 
-  const dismissTimerRef = useRef<number | null>(null);
+  // Subtitle state
+  const [subtitleBlocks, setSubtitleBlocks] = useState<string[]>([]);
+  const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
+  const [showSubtitle, setShowSubtitle] = useState(false);
+
+  const messageTimerRef = useRef<number | null>(null);
   const enterTimerRef = useRef<number | null>(null);
+  const blockIntervalRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Preload images
@@ -84,57 +93,109 @@ const ObsBolinha = () => {
     });
   }, []);
 
-  const resetToIdle = useCallback(() => {
-    setBalloonClass('balloon-exit');
+  const clearAllTimers = useCallback(() => {
+    if (messageTimerRef.current) { clearTimeout(messageTimerRef.current); messageTimerRef.current = null; }
+    if (enterTimerRef.current) { clearTimeout(enterTimerRef.current); enterTimerRef.current = null; }
+    if (blockIntervalRef.current) { clearInterval(blockIntervalRef.current); blockIntervalRef.current = null; }
+  }, []);
+
+  const resetBolinha = useCallback(() => {
+    clearAllTimers();
+    // Fade out subtitle
+    setShowSubtitle(false);
+
+    // After subtitle fades (400ms), reset bolinha
     setTimeout(() => {
-      setIsShowingMessage(false);
-      setMessageText('');
-      setBalloonClass('balloon-enter');
       setCurrentEmotion('neutro');
       setAnimClass('bolinha-idle');
-    }, 500);
+      setSubtitleBlocks([]);
+      setCurrentBlockIndex(0);
+    }, 400);
+  }, [clearAllTimers]);
+
+  const startSubtitleCycle = useCallback((blocks: string[], timePerBlock: number) => {
+    if (blockIntervalRef.current) clearInterval(blockIntervalRef.current);
+    let idx = 0;
+    blockIntervalRef.current = window.setInterval(() => {
+      idx++;
+      if (idx < blocks.length) {
+        setCurrentBlockIndex(idx);
+      } else {
+        if (blockIntervalRef.current) clearInterval(blockIntervalRef.current);
+        blockIntervalRef.current = null;
+      }
+    }, timePerBlock);
   }, []);
 
   const handleNewMessage = useCallback((msg: BolinhaMessage) => {
-    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
-    if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
+    // Clear everything from previous message
+    clearAllTimers();
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
 
-    // 1. Entry animation
-    setCurrentEmotion(msg.emotion || 'neutro');
-    setMessageText(msg.text);
-    setIsShowingMessage(true);
-    setBalloonClass('balloon-enter');
-    setAnimClass('bolinha-enter');
+    const blocks = splitIntoSubtitles(msg.text, 80);
 
-    // 2. After entry → emotion-specific animation
+    // 1. Set emotion + entry animation
+    setCurrentEmotion(msg.emotion || 'neutro');
+    setAnimClass('bolinha-enter');
+    setSubtitleBlocks(blocks);
+    setCurrentBlockIndex(0);
+    setShowSubtitle(true);
+
+    // 2. After entry (600ms) → emotion-specific animation (infinite)
     enterTimerRef.current = window.setTimeout(() => {
       setAnimClass(EMOTION_ANIM_MAP[msg.emotion] || 'bolinha-idle');
     }, 600);
 
-    // Audio handling
+    // 3. Audio handling
     if (msg.audioBase64) {
       try {
         const audio = new Audio(msg.audioBase64);
         audioRef.current = audio;
-        audio.play().catch(() => {});
-        audio.onloadedmetadata = () => {
-          const audioDuration = (audio.duration || 0) * 1000;
-          const delay = Math.max(8000, audioDuration + 500);
-          if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
-          dismissTimerRef.current = window.setTimeout(resetToIdle, delay);
-        };
-      } catch {
-        // fall through to default timer
-      }
-    }
 
-    // Default 8s dismiss
-    dismissTimerRef.current = window.setTimeout(resetToIdle, 8000);
-  }, [resetToIdle]);
+        audio.addEventListener('ended', () => {
+          resetBolinha();
+        });
+        audio.addEventListener('error', () => {
+          resetBolinha();
+        });
+
+        audio.play().then(() => {
+          // Audio playing — cycle subtitles based on audio duration when available
+          if (audio.duration && isFinite(audio.duration)) {
+            const timePerBlock = Math.max(2000, (audio.duration * 1000) / blocks.length);
+            startSubtitleCycle(blocks, timePerBlock);
+          } else {
+            audio.addEventListener('loadedmetadata', () => {
+              const timePerBlock = Math.max(2000, (audio.duration * 1000) / blocks.length);
+              startSubtitleCycle(blocks, timePerBlock);
+            }, { once: true });
+            // Fallback if metadata never loads
+            startSubtitleCycle(blocks, 3000);
+          }
+        }).catch(() => {
+          // Autoplay blocked — use timer-based fallback
+          startSubtitleCycle(blocks, 3000);
+          const totalDuration = blocks.length * 3000 + 1000;
+          messageTimerRef.current = window.setTimeout(resetBolinha, totalDuration);
+        });
+
+        // Safety fallback — 30s max
+        messageTimerRef.current = window.setTimeout(resetBolinha, 30000);
+      } catch {
+        startSubtitleCycle(blocks, 3000);
+        const totalDuration = blocks.length * 3000 + 1000;
+        messageTimerRef.current = window.setTimeout(resetBolinha, totalDuration);
+      }
+    } else {
+      // No audio — timer based on block count
+      startSubtitleCycle(blocks, 3000);
+      const totalDuration = blocks.length * 3000 + 1000;
+      messageTimerRef.current = window.setTimeout(resetBolinha, totalDuration);
+    }
+  }, [clearAllTimers, resetBolinha, startSubtitleCycle]);
 
   // Subscribe to Realtime
   useEffect(() => {
@@ -147,39 +208,38 @@ const ObsBolinha = () => {
 
     return () => {
       supabase.removeChannel(channel);
-      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
-      if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
+      clearAllTimers();
     };
-  }, [handleNewMessage]);
+  }, [handleNewMessage, clearAllTimers]);
 
-  const activeFilter = isShowingMessage
+  const activeFilter = showSubtitle
     ? 'drop-shadow(0 8px 25px rgba(212,175,55,0.3)) drop-shadow(0 4px 12px rgba(0,0,0,0.5))'
     : 'drop-shadow(0 8px 20px rgba(0,0,0,0.5))';
+
+  const currentSubtitle = subtitleBlocks[currentBlockIndex] || '';
 
   return (
     <OBSLayout className="flex items-end justify-center pb-2.5">
       <div className="relative flex flex-col items-center">
-        {/* Speech balloon */}
-        {isShowingMessage && messageText && (
-          <div className={`mb-3 ${balloonClass}`} style={{ maxWidth: '420px' }}>
-            <div className="rounded-xl bg-white px-4 py-3 text-center shadow-lg">
+        {/* Cinema-style subtitle */}
+        {showSubtitle && currentSubtitle && (
+          <div className={`subtitle-container mb-3 ${showSubtitle ? '' : 'subtitle-fade-out'}`}>
+            <div
+              key={currentBlockIndex}
+              className="subtitle-fade-enter rounded-xl bg-black/80 px-5 py-3 text-center shadow-lg backdrop-blur-sm"
+            >
               <p
-                className="font-heading font-semibold leading-snug text-gray-900"
-                style={{ fontSize: '19px' }}
-              >
-                <TypewriterText text={messageText} speed={30} />
-              </p>
-            </div>
-            {/* Triangle pointer */}
-            <div className="flex justify-center">
-              <div
-                className="h-0 w-0"
+                className="font-heading font-bold leading-snug text-white"
                 style={{
-                  borderLeft: '10px solid transparent',
-                  borderRight: '10px solid transparent',
-                  borderTop: '10px solid white',
+                  fontSize: '22px',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
                 }}
-              />
+              >
+                {currentSubtitle}
+              </p>
             </div>
           </div>
         )}
