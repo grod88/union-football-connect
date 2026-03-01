@@ -27,13 +27,15 @@ async function fetchFromAPI(supabaseUrl: string, endpoint: string, params: Recor
   }
 }
 
-function generateContextSummary(data: {
+// =========================================
+// RESUMO PRÉ-JOGO (predições, H2H, lesões, escalações)
+// =========================================
+function generatePreMatchSummary(data: {
   fixture: any;
   injuries: any[];
   predictions: any;
   h2h: any[];
   lineups: any[];
-  statistics: any[];
 }): string {
   const lines: string[] = [];
 
@@ -44,33 +46,30 @@ function generateContextSummary(data: {
     const league = f.league?.name || "";
     const round = f.league?.round || "";
     const venue = f.fixture?.venue?.name || "";
-    const status = f.fixture?.status?.long || "";
-    const scoreHome = f.goals?.home ?? "-";
-    const scoreAway = f.goals?.away ?? "-";
 
     lines.push(`JOGO: ${home} vs ${away}`);
     lines.push(`COMPETIÇÃO: ${league} — ${round}`);
     if (venue) lines.push(`ESTÁDIO: ${venue}`);
-    lines.push(`STATUS: ${status} | Placar: ${scoreHome} x ${scoreAway}`);
   }
 
   if (data.predictions?.predictions) {
     const pred = data.predictions.predictions;
     const winner = pred.winner?.name || "indefinido";
     const advice = pred.advice || "";
-    lines.push(`\nPREDIÇÃO: Favorito: ${winner}`);
-    if (advice) lines.push(`CONSELHO: ${advice}`);
+    lines.push(`\nPREDIÇÃO PRÉ-JOGO:`);
+    lines.push(`Favorito: ${winner}`);
+    if (advice) lines.push(`Conselho: ${advice}`);
 
     if (data.predictions.comparison) {
       const comp = data.predictions.comparison;
-      lines.push(
-        `COMPARAÇÃO: Forma: ${comp.form?.home || "?"} vs ${comp.form?.away || "?"}, Ataque: ${comp.att?.home || "?"} vs ${comp.att?.away || "?"}, Defesa: ${comp.def?.home || "?"} vs ${comp.def?.away || "?"}`
-      );
+      lines.push(`Forma: ${comp.form?.home || "?"} vs ${comp.form?.away || "?"}`);
+      lines.push(`Ataque: ${comp.att?.home || "?"} vs ${comp.att?.away || "?"}`);
+      lines.push(`Defesa: ${comp.def?.home || "?"} vs ${comp.def?.away || "?"}`);
     }
   }
 
   if (data.injuries?.length > 0) {
-    lines.push(`\nLESÕES E DESFALQUES:`);
+    lines.push(`\nDESFALQUES E LESÕES:`);
     const grouped: Record<string, string[]> = {};
     for (const inj of data.injuries) {
       const team = inj.team?.name || "Time";
@@ -87,9 +86,7 @@ function generateContextSummary(data: {
 
   if (data.h2h?.length > 0) {
     lines.push(`\nÚLTIMOS CONFRONTOS DIRETOS:`);
-    let homeWins = 0,
-      awayWins = 0,
-      draws = 0;
+    let homeWins = 0, awayWins = 0, draws = 0;
     const last5 = data.h2h.slice(0, 5);
     for (const match of last5) {
       const hg = match.goals?.home ?? 0;
@@ -102,7 +99,7 @@ function generateContextSummary(data: {
       else if (match.teams?.away?.winner) awayWins++;
       else draws++;
     }
-    lines.push(`Nos últimos ${last5.length}: ${homeWins} vitórias casa, ${awayWins} visitante, ${draws} empates`);
+    lines.push(`Resumo: ${homeWins} vitórias casa, ${awayWins} visitante, ${draws} empates`);
   }
 
   if (data.lineups?.length > 0) {
@@ -117,22 +114,115 @@ function generateContextSummary(data: {
     }
   }
 
+  return lines.join("\n");
+}
+
+// =========================================
+// RESUMO AO VIVO (placar, stats, eventos)
+// =========================================
+function generateLiveMatchSummary(data: {
+  fixture: any;
+  statistics: any[];
+  events: any[];
+}): string {
+  const lines: string[] = [];
+
+  if (data.fixture) {
+    const f = data.fixture;
+    const home = f.teams?.home?.name || "Time Casa";
+    const away = f.teams?.away?.name || "Time Fora";
+    const scoreHome = f.goals?.home ?? 0;
+    const scoreAway = f.goals?.away ?? 0;
+    const status = f.fixture?.status?.long || "";
+    const elapsed = f.fixture?.status?.elapsed || 0;
+
+    lines.push(`PLACAR ATUAL: ${home} ${scoreHome} x ${scoreAway} ${away}`);
+    lines.push(`STATUS: ${status} — ${elapsed} minutos`);
+  }
+
   if (data.statistics?.length >= 2) {
-    lines.push(`\nESTATÍSTICAS AO VIVO:`);
     const home = data.statistics[0];
     const away = data.statistics[1];
     const homeName = home.team?.name || "Casa";
     const awayName = away.team?.name || "Fora";
 
-    const stats = home.statistics || [];
-    for (const stat of stats) {
-      const type = stat.type || "";
-      const hVal = stat.value ?? 0;
-      const aVal = (away.statistics || []).find((s: any) => s.type === type)?.value ?? 0;
-      if (hVal !== 0 || aVal !== 0) {
-        lines.push(`${type}: ${homeName} ${hVal} — ${aVal} ${awayName}`);
+    lines.push(`\nESTATÍSTICAS AO VIVO:`);
+
+    const importantStats = [
+      "Ball Possession",
+      "Total Shots",
+      "Shots on Goal",
+      "Corner Kicks",
+      "Fouls",
+      "Yellow Cards",
+      "Red Cards",
+      "Offsides",
+      "Passes %",
+      "expected_goals",
+    ];
+
+    const homeStats = home.statistics || [];
+    const awayStats = away.statistics || [];
+
+    for (const statType of importantStats) {
+      const normalize = (s: string) => s.toLowerCase().replace(/\s/g, "_");
+      const hStat = homeStats.find((s: any) => normalize(s.type || "") === normalize(statType) || s.type === statType);
+      const aStat = awayStats.find((s: any) => normalize(s.type || "") === normalize(statType) || s.type === statType);
+
+      if (hStat || aStat) {
+        const hVal = hStat?.value ?? 0;
+        const aVal = aStat?.value ?? 0;
+        const label = hStat?.type || aStat?.type || statType;
+        lines.push(`${label}: ${homeName} ${hVal} — ${aVal} ${awayName}`);
       }
     }
+
+    // Automatic dominance analysis
+    const possession = homeStats.find((s: any) => s.type === "Ball Possession");
+    if (possession) {
+      const homeP = parseInt(String(possession.value)) || 50;
+      if (homeP >= 60) lines.push(`ANÁLISE: ${homeName} DOMINA a posse de bola`);
+      else if (homeP <= 40) lines.push(`ANÁLISE: ${awayName} DOMINA a posse de bola`);
+    }
+
+    const homeShotsOn = Number(homeStats.find((s: any) => s.type === "Shots on Goal")?.value || 0);
+    const awayShotsOn = Number(awayStats.find((s: any) => s.type === "Shots on Goal")?.value || 0);
+    if (homeShotsOn > awayShotsOn * 2 && homeShotsOn > 0) {
+      lines.push(`ANÁLISE: ${homeName} muito mais perigoso, ${homeShotsOn} chutes no gol contra ${awayShotsOn}`);
+    } else if (awayShotsOn > homeShotsOn * 2 && awayShotsOn > 0) {
+      lines.push(`ANÁLISE: ${awayName} muito mais perigoso, ${awayShotsOn} chutes no gol contra ${homeShotsOn}`);
+    }
+  }
+
+  if (data.events?.length > 0) {
+    lines.push(`\nEVENTOS DO JOGO:`);
+    const sorted = [...data.events].sort((a: any, b: any) =>
+      (a.time?.elapsed || 0) - (b.time?.elapsed || 0)
+    );
+    for (const ev of sorted) {
+      const min = ev.time?.elapsed || "?";
+      const extra = ev.time?.extra ? `+${ev.time.extra}` : "";
+      const team = ev.team?.name || "";
+      const player = ev.player?.name || "";
+      const assist = ev.assist?.name ? ` (assist: ${ev.assist.name})` : "";
+      const type = ev.type || "";
+      const detail = ev.detail || "";
+
+      let emoji = "•";
+      if (type === "Goal") emoji = "⚽";
+      else if (type === "Card" && detail === "Yellow Card") emoji = "🟨";
+      else if (type === "Card" && detail === "Red Card") emoji = "🟥";
+      else if (type === "subst") emoji = "🔄";
+      else if (type === "Var") emoji = "📺";
+
+      lines.push(`${min}'${extra} ${emoji} ${team}: ${player} — ${type} ${detail}${assist}`);
+    }
+
+    const goals = data.events.filter((e: any) => e.type === "Goal").length;
+    const yellows = data.events.filter((e: any) => e.type === "Card" && e.detail === "Yellow Card").length;
+    const reds = data.events.filter((e: any) => e.type === "Card" && e.detail === "Red Card").length;
+    const subs = data.events.filter((e: any) => e.type === "subst").length;
+    lines.push(`\nRESUMO: ${goals} gol(s), ${yellows} amarelo(s), ${reds} vermelho(s), ${subs} substituição(ões)`);
   }
 
   return lines.join("\n");
@@ -159,7 +249,6 @@ serve(async (req) => {
 
     console.log(`Syncing match context for fixture ${fixture_id}...`);
 
-    // Fetch 6 endpoints in parallel
     const [fixtureRaw, injuriesRaw, predictionsRaw, lineupsRaw, statisticsRaw, eventsRaw] = await Promise.all([
       fetchFromAPI(supabaseUrl, "/fixtures", { id: String(fixture_id) }),
       fetchFromAPI(supabaseUrl, "/injuries", { fixture: String(fixture_id) }),
@@ -176,7 +265,6 @@ serve(async (req) => {
     const statistics = Array.isArray(statisticsRaw) ? statisticsRaw : [];
     const events = Array.isArray(eventsRaw) ? eventsRaw : [];
 
-    // Fetch H2H sequentially (needs team IDs from fixture)
     let h2h: any[] = [];
     if (fixture?.teams?.home?.id && fixture?.teams?.away?.id) {
       const homeId = fixture.teams.home.id;
@@ -188,7 +276,6 @@ serve(async (req) => {
       h2h = Array.isArray(h2hRaw) ? h2hRaw : [];
     }
 
-    // Extract basic info
     const homeTeamName = fixture?.teams?.home?.name || null;
     const homeTeamId = fixture?.teams?.home?.id || null;
     const awayTeamName = fixture?.teams?.away?.name || null;
@@ -198,19 +285,12 @@ serve(async (req) => {
     const venueName = fixture?.fixture?.venue?.name || null;
     const matchDate = fixture?.fixture?.date || null;
 
-    // Generate textual summary for Claude
-    const contextSummary = generateContextSummary({
-      fixture,
-      injuries,
-      predictions,
-      h2h,
-      lineups,
-      statistics,
-    });
+    // Generate BOTH summaries
+    const preMatchSummary = generatePreMatchSummary({ fixture, injuries, predictions, h2h, lineups });
+    const liveSummary = generateLiveMatchSummary({ fixture, statistics, events });
 
-    console.log(`Context summary generated (${contextSummary.length} chars)`);
+    console.log(`Pre-match summary: ${preMatchSummary.length} chars, Live summary: ${liveSummary.length} chars`);
 
-    // Upsert into bolinha_match_context
     const { error } = await supabase.from("bolinha_match_context").upsert(
       {
         fixture_id,
@@ -229,7 +309,9 @@ serve(async (req) => {
         lineups_data: lineups,
         statistics_data: statistics,
         events_data: events,
-        context_summary: contextSummary,
+        pre_match_summary: preMatchSummary,
+        live_summary: liveSummary,
+        context_summary: null,
         last_synced_at: new Date().toISOString(),
         is_active: true,
       },
@@ -257,7 +339,8 @@ serve(async (req) => {
         has_lineups: lineups.length > 0,
         has_statistics: statistics.length > 0,
         has_events: events.length > 0,
-        context_summary_length: contextSummary.length,
+        pre_match_summary_length: preMatchSummary.length,
+        live_summary_length: liveSummary.length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -203,18 +203,18 @@ export default function AdminBolinha() {
   const leagueName = matchContext?.league_name || 'campeonato';
 
   const quickActions = useMemo(() => [
-    { icon: '👋', label: 'Olá galera!', prompt: `Cumprimente a galera da live do Union Football Live! É dia de ${homeName} x ${awayName} pelo ${leagueName}! Diga que o Bolinha tá pronto pra resenha!` },
-    { icon: '📊', label: 'Pré-jogo', prompt: `Faça uma análise pré-jogo de ${homeName} x ${awayName}. Use os dados de predição, H2H e lesões do contexto. Traga curiosidades e sua opinião sobre quem leva.` },
-    { icon: '🔮', label: 'Predição', prompt: `Dê seu palpite para ${homeName} x ${awayName}. Use os dados de predição e comparação do contexto. Seja opinativo e divertido.` },
-    { icon: '⚽', label: `Gol ${homeName.split(' ')[0]}!`, prompt: `GOL DO ${homeName.toUpperCase()} contra o ${awayName}! Comemora com energia! Use dados do contexto se possível.` },
-    { icon: '⚽', label: `Gol ${awayName.split(' ')[0]}`, prompt: `Gol do ${awayName} contra o ${homeName}. Comente reconhecendo o gol.` },
-    { icon: '🟨', label: 'Cartão!', prompt: `Saiu cartão no jogo ${homeName} x ${awayName}! Comente com sarcasmo sobre a tensão do jogo.` },
-    { icon: '😡', label: 'Juiz errou!', prompt: `O juiz errou feio em ${homeName} x ${awayName}! Lance polêmico! Fique indignado!` },
-    { icon: '👏', label: 'Que jogada!', prompt: `Que jogada linda em ${homeName} x ${awayName}! Elogie a qualidade técnica.` },
-    { icon: '😴', label: 'Jogo parado', prompt: `O jogo ${homeName} x ${awayName} tá sem emoção. Reclame com humor.` },
-    { icon: '📊', label: 'Intervalo', prompt: `É intervalo em ${homeName} x ${awayName} pelo ${leagueName}. Faça um resumo sarcástico do primeiro tempo. Use as estatísticas do contexto.` },
-    { icon: '🏥', label: 'Desfalques', prompt: `Comente sobre os desfalques e lesões no jogo ${homeName} x ${awayName}. Use os dados de lesões do contexto para falar de jogadores específicos.` },
-    { icon: '🏁', label: 'Fim de jogo!', prompt: `Acabou ${homeName} x ${awayName} pelo ${leagueName}! Dê seu veredito final. Use as estatísticas para embasar.` },
+    { icon: '👋', label: 'Olá galera!', prompt: `Cumprimente a galera da live do Union Football Live! É dia de ${homeName} x ${awayName} pelo ${leagueName}! Diga que o Bolinha tá pronto pra resenha! Use DADOS PRÉ-JOGO se disponíveis.` },
+    { icon: '📊', label: 'Pré-jogo', prompt: `Faça uma análise pré-jogo de ${homeName} x ${awayName}. Use os DADOS PRÉ-JOGO: predição, H2H, lesões e escalações. Traga curiosidades e sua opinião sobre quem leva.` },
+    { icon: '🔮', label: 'Predição', prompt: `Dê seu palpite para ${homeName} x ${awayName}. Use os DADOS PRÉ-JOGO: predição e comparação. Seja opinativo e divertido.` },
+    { icon: '⚽', label: `Gol ${homeName.split(' ')[0]}!`, prompt: `GOL DO ${homeName.toUpperCase()} contra o ${awayName}! Comemora com energia! Use DADOS AO VIVO: placar, chutes no gol, posse. NÃO use predições.` },
+    { icon: '⚽', label: `Gol ${awayName.split(' ')[0]}`, prompt: `Gol do ${awayName} contra o ${homeName}! Comente o gol. Use DADOS AO VIVO: placar, finalizações, posse. NÃO use predições.` },
+    { icon: '🟨', label: 'Cartão!', prompt: `Saiu cartão no jogo ${homeName} x ${awayName}! Use DADOS AO VIVO: total de faltas, cartões já dados, tensão do jogo. NÃO use dados de predição.` },
+    { icon: '😡', label: 'Juiz errou!', prompt: `O juiz errou feio em ${homeName} x ${awayName}! Lance polêmico! Fique indignado! Use DADOS AO VIVO se disponíveis.` },
+    { icon: '👏', label: 'Que jogada!', prompt: `Que jogada linda em ${homeName} x ${awayName}! Elogie a qualidade técnica. Use DADOS AO VIVO.` },
+    { icon: '😴', label: 'Jogo parado', prompt: `O jogo ${homeName} x ${awayName} tá sem emoção. Use DADOS AO VIVO: chutes no gol, finalizações, posse pra justificar o tédio.` },
+    { icon: '📊', label: 'Intervalo', prompt: `É intervalo em ${homeName} x ${awayName} pelo ${leagueName}. Faça um resumo do primeiro tempo. Use DADOS AO VIVO: posse, finalizações, chutes no gol, escanteios, faltas, eventos.` },
+    { icon: '🏥', label: 'Desfalques', prompt: `Comente sobre os desfalques e lesões no jogo ${homeName} x ${awayName}. Use DADOS PRÉ-JOGO: lista de jogadores lesionados.` },
+    { icon: '🏁', label: 'Fim de jogo!', prompt: `Acabou ${homeName} x ${awayName} pelo ${leagueName}! Dê seu veredito final. Use DADOS AO VIVO: placar, posse, finalizações, eventos do jogo.` },
   ], [homeName, awayName, leagueName]);
 
   /* ── handlers ── */
@@ -354,9 +354,20 @@ export default function AdminBolinha() {
                       <DialogHeader>
                         <DialogTitle className="text-white">Contexto completo da partida</DialogTitle>
                       </DialogHeader>
-                      <pre className="text-xs text-gray-300 whitespace-pre-wrap overflow-y-auto max-h-[60vh] font-mono bg-gray-950 p-4 rounded-lg">
-                        {matchContext.context_summary || 'Sem contexto gerado.'}
-                      </pre>
+                      <div className="overflow-y-auto max-h-[60vh] space-y-4">
+                        <div>
+                          <h3 className="text-sm font-bold text-yellow-400 mb-1">📊 DADOS PRÉ-JOGO</h3>
+                          <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono bg-gray-950 p-3 rounded-lg">
+                            {matchContext.pre_match_summary || matchContext.context_summary || 'Sem dados pré-jogo.'}
+                          </pre>
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-green-400 mb-1">⚡ DADOS AO VIVO</h3>
+                          <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono bg-gray-950 p-3 rounded-lg">
+                            {matchContext.live_summary || 'Sem dados ao vivo (jogo não começou ou sem sync recente).'}
+                          </pre>
+                        </div>
+                      </div>
                     </DialogContent>
                   </Dialog>
                 </div>

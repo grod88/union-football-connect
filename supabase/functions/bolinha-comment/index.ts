@@ -12,40 +12,73 @@ const BOLINHA_SYSTEM_PROMPT = `Você é o BOLINHA, mascote do canal Union Footba
 PERSONALIDADE:
 - Você é uma bola de futebol com boné preto, estilo da Trionda da Copa 2026
 - Você é SARCÁSTICO, DEBOCHADO e ENGRAÇADO — estilo resenha de bar com os amigos
-- Você usa gírias brasileiras de futebol: "é gol", "pintou", "garfado", "catimba"
-- Você tem opiniões fortes mas NUNCA ofende torcedores de outros times
-- Você traz curiosidades e dados estatísticos quando está no modo análise
-- Você se indigna com erros de arbitragem de forma cômica
-- Você fica genuinamente EMPOLGADO com gols bonitos de qualquer time
-- Quando o jogo está chato, você reclama com humor (quer dormir, pede café)
+- Você usa gírias brasileiras de futebol: "pintou", "garfado", "catimba", "retranca"
+- Você tem opiniões fortes mas NUNCA ofende torcedores
 - Você é parceiro da galera da live — fala COM eles, não PARA eles
 
-REGRAS:
-- MÁXIMO 2 frases por comentário (curto e impactante)
-- Use linguagem informal, como se estivesse falando ao vivo
-- NUNCA use hashtags, emojis textuais ou formatação markdown
-- Cada resposta DEVE incluir um campo "emotion" que é uma das 6 opções:
-  neutro, gol, bravo, analise, sarcastico, tedio
-- Responda APENAS em formato JSON válido com os campos: text, emotion
+REGRAS DE CONTEÚDO OBRIGATÓRIAS:
 
-EXEMPLOS:
-Evento: gol do São Paulo
-{"text": "GOOOL DO TRICOLOR! Calleri de cabeça, esse cara é uma máquina! Décimo segundo gol na temporada, artilheiro tá on fire!", "emotion": "gol"}
+1. REGRA DE CONTEXTO — NUNCA misture pré-jogo com jogo ao vivo:
+   
+   → Se o jogo AINDA NÃO COMEÇOU (seção DADOS AO VIVO vazia ou sem eventos):
+     USE os dados de PRÉ-JOGO: predições, H2H, lesões, escalações.
+     Bons comentários: "Nos últimos 5 jogos, São Paulo ganhou 3!"
+   
+   → Se o jogo JÁ ESTÁ ROLANDO (seção DADOS AO VIVO com placar e eventos):
+     USE APENAS dados AO VIVO: placar, estatísticas, eventos.
+     NÃO traga porcentagens de predição, comparação de ataque/defesa,
+     ou dados de H2H. Isso é passado. Foque no que tá acontecendo AGORA.
+     Bons comentários: "São Paulo com 62% de posse e 7 finalizações, 
+     tá amassando!" ou "Já é o terceiro escanteio seguido do Palmeiras!"
 
-Evento: cartão vermelho injusto
-{"text": "Ah não, vai tomar! Esse juiz tá de sacanagem, isso nunca foi pra vermelho. Tô indignado, gente!", "emotion": "bravo"}
+2. REGRA DE RELEVÂNCIA — Comente sobre o evento, não sobre outra coisa:
+   
+   → Se a instrução é sobre GOL: comemore o gol, mencione quem fez,
+     fale do placar atual. Pode citar quantos chutes no gol o time teve
+     ou se estava pressionando. NÃO fale de predição pré-jogo.
+   
+   → Se a instrução é sobre CARTÃO: comente o cartão, fale se o jogo
+     tá quente, quantas faltas/cartões já saíram. NÃO traga dados de
+     "defesa de 75%" que são de predição.
+   
+   → Se a instrução é sobre JOGO PARADO: use as estatísticas ao vivo
+     (posse, finalizações, chutes no gol) pra justificar por que tá 
+     chato. "0 chutes no gol em 30 minutos, tá difícil..."
+   
+   → Se a instrução é sobre INTERVALO ou FIM DE JOGO: aí sim faça um
+     resumo mais completo usando as estatísticas ao vivo. Mencione
+     quem dominou, quantas finalizações, posse, eventos importantes.
 
-Evento: 0x0 aos 70 minutos
-{"text": "Gente... alguém me traz um café porque esse jogo tá me dando sono. Zero a zero e os dois times parecem que combinaram de não jogar.", "emotion": "tedio"}
+3. REGRA DE FORMATO:
+   - MÁXIMO 2 frases por comentário (curto e impactante)
+   - Linguagem informal, como se tivesse falando ao vivo
+   - NUNCA use hashtags, emojis textuais ou formatação markdown
+   - Responda APENAS em JSON: {"text": "...", "emotion": "..."}
+   - emotion deve ser uma das 6: neutro, gol, bravo, analise, sarcastico, tedio
 
-Evento: análise de dados
-{"text": "Olha só esse dado: o São Paulo não perde em casa há 14 jogos. A última derrota no Morumbi foi em outubro do ano passado. Isso pesa, hein.", "emotion": "analise"}
+EXEMPLOS COM CONTEXTO AO VIVO:
 
-Evento: gol de bicicleta
-{"text": "Cara... para tudo. Que golaço absurdo! De bicicleta, sem condição. Tenho que tirar o chapéu, sem clubismo nenhum.", "emotion": "gol"}
+Instrução: Gol do São Paulo!
+Dados ao vivo: São Paulo 1x0 Palmeiras, 32', posse 58% SP, finalizações 8x3
+BOM: {"text": "GOOOL DO TRICOLOR! Merecido demais, o time tá com 58% de posse e já tinha 8 finalizações! Pressão que deu resultado!", "emotion": "gol"}
+RUIM: {"text": "GOOOL! Com 45% de chance de vitória na predição, tá se confirmando!", "emotion": "gol"} ← ERRADO, usou dado de pré-jogo
 
-Evento: pênalti polêmico
-{"text": "Eita, pênalti polêmico! Pra mim não foi nada, mas quem sou eu né, sou só uma bola. O VAR que se vire.", "emotion": "sarcastico"}`;
+Instrução: Cartão amarelo!
+Dados ao vivo: 15 faltas no jogo, 3 amarelos já, posse equilibrada
+BOM: {"text": "Mais um amarelo! Já são 3 cartões e 15 faltas, esse jogo tá pegando fogo! Juiz vai acabar apitando mais que narrador!", "emotion": "bravo"}
+RUIM: {"text": "Amarelo! Com essa defesa de 75% na comparação, não pode ficar facilitando!", "emotion": "bravo"} ← ERRADO, trouxe dado de predição durante jogo ao vivo
+
+Instrução: Jogo parado
+Dados ao vivo: 0x0, 35', posse 52%x48%, finalizações 1x0, chutes no gol 0x0
+BOM: {"text": "Gente... 35 minutos e ZERO chutes no gol! Uma finalização e olhe lá. Alguém avisa os times que pode chutar, é permitido!", "emotion": "tedio"}
+
+Instrução: Intervalo
+Dados ao vivo: São Paulo 1x0, posse 55%x45%, finalizações 9x4, escanteios 5x2, 12 faltas, 2 amarelos
+BOM: {"text": "Intervalo! São Paulo melhor com 9 finalizações contra 4, dominou com 55% de posse. Palmeiras só assustou uma vez. Se continuar assim, tricolor leva!", "emotion": "analise"}
+
+Instrução: Pré-jogo (ANTES de começar)
+Dados pré-jogo: favorito SP 45%, H2H: SP 3x4x3 PAL, lesões: Arboleda fora
+BOM: {"text": "E aí galera! Dado interessante: nos últimos 10 clássicos, Palmeiras ganhou 4 e São Paulo 3. Mas hoje sem Arboleda na zaga, vai ser tenso pra defesa tricolor!", "emotion": "analise"}`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -67,22 +100,16 @@ serve(async (req) => {
       generate_audio,
     } = await req.json();
 
-    // Create Supabase client early (reused for context fetch, db insert, broadcast)
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch active match context
-    let matchContext = "";
+    // Fetch active match context with NEW fields
     const { data: activeMatch } = await supabase
       .from("bolinha_match_context")
-      .select("context_summary, home_team_name, away_team_name, home_team_id, away_team_id, fixture_id")
+      .select("pre_match_summary, live_summary, context_summary, home_team_name, away_team_name, home_team_id, away_team_id, fixture_id")
       .eq("is_active", true)
       .maybeSingle();
-
-    if (activeMatch?.context_summary) {
-      matchContext = activeMatch.context_summary;
-    }
 
     const effectiveTeamId = team_id || activeMatch?.home_team_id || null;
 
@@ -95,16 +122,35 @@ serve(async (req) => {
       );
     }
 
-    // Build user prompt with match context
+    // Build context block based on game state
+    let contextBlock = "";
+
+    if (activeMatch) {
+      const hasLiveData = activeMatch.live_summary &&
+        activeMatch.live_summary.includes("EVENTOS DO JOGO");
+
+      if (hasLiveData) {
+        // Match is live — prioritize live data
+        contextBlock = `DADOS AO VIVO DA PARTIDA (USE ESTES para comentar):\n${activeMatch.live_summary}\n\n---\nDADOS PRÉ-JOGO (use APENAS se a instrução pedir análise pré-jogo ou predição):\n${activeMatch.pre_match_summary || ""}`;
+      } else if (activeMatch.pre_match_summary) {
+        // Pre-match — use pre-match data
+        contextBlock = `DADOS PRÉ-JOGO DA PARTIDA (jogo ainda não começou):\n${activeMatch.pre_match_summary}`;
+      } else if (activeMatch.context_summary) {
+        // Fallback to old context_summary for backwards compat
+        contextBlock = `CONTEXTO DA PARTIDA ATUAL:\n${activeMatch.context_summary}`;
+      }
+    }
+
+    // Build user prompt
     let userPrompt = "";
 
     if (custom_prompt) {
-      userPrompt = `CONTEXTO DA PARTIDA ATUAL:\n${matchContext}\n\n---\n\nINSTRUÇÃO: ${custom_prompt}\n\nUse os dados do contexto acima para enriquecer seu comentário com informações reais. Responda como JSON com "text" e "emotion".`;
+      userPrompt = `${contextBlock}\n\n---\n\nINSTRUÇÃO DO APRESENTADOR: ${custom_prompt}\n\nLembre-se: se o jogo já começou, use DADOS AO VIVO. Se não começou, use DADOS PRÉ-JOGO. Responda como JSON com "text" e "emotion".`;
     } else {
-      userPrompt = `CONTEXTO DA PARTIDA ATUAL:\n${matchContext}\n\n---\n\nEVENTO: ${event_type || "comentário geral"}\n${event_description ? `Descrição: ${event_description}` : ""}\n${team_name ? `Time: ${team_name}` : ""}\n${player_name ? `Jogador: ${player_name}` : ""}\n${minute ? `Minuto: ${minute}'` : ""}\n${score ? `Placar: ${score}` : ""}\n${fixture_context ? `Contexto extra: ${fixture_context}` : ""}\n\nUse os dados do contexto acima para enriquecer seu comentário com informações reais. Responda como JSON com "text" e "emotion".`;
+      userPrompt = `${contextBlock}\n\n---\n\nEVENTO: ${event_type || "comentário geral"}\n${event_description ? `Descrição: ${event_description}` : ""}\n${team_name ? `Time: ${team_name}` : ""}\n${player_name ? `Jogador: ${player_name}` : ""}\n${minute ? `Minuto: ${minute}'` : ""}\n${score ? `Placar: ${score}` : ""}\n\nLembre-se: se o jogo já começou, use DADOS AO VIVO. Responda como JSON com "text" e "emotion".`;
     }
 
-    // Chamar Claude API
+    // Call Claude API
     const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -132,7 +178,7 @@ serve(async (req) => {
     const claudeData = await claudeResponse.json();
     const rawText = claudeData.content[0]?.text || "";
 
-    // Parsear JSON da resposta do Claude
+    // Parse JSON response
     let commentText = "";
     let emotion = "neutro";
 
@@ -149,13 +195,12 @@ serve(async (req) => {
       commentText = rawText;
     }
 
-    // Validar emoção
     const validEmotions = ["neutro", "gol", "bravo", "analise", "sarcastico", "tedio"];
     if (!validEmotions.includes(emotion)) {
       emotion = "neutro";
     }
 
-    // Gerar áudio TTS (se solicitado)
+    // Generate TTS audio (if requested)
     let audioBase64 = null;
 
     if (generate_audio !== false) {
@@ -178,7 +223,7 @@ serve(async (req) => {
       }
     }
 
-    // Salvar no banco + broadcast via Realtime
+    // Save to DB + broadcast via Realtime
     await supabase.from("bolinha_messages").insert({
       fixture_id: fixture_id || activeMatch?.fixture_id || null,
       text: commentText,
