@@ -15,7 +15,7 @@ export const translations = {
     },
     // Next Match
     nextMatch: {
-      title: 'Próximo Jogo',
+      title: 'Próximas Lives',
       loading: 'Carregando...',
       error: 'Não foi possível carregar o próximo jogo.',
       watchLive: 'Assistir Live',
@@ -75,7 +75,7 @@ export const translations = {
       taglineSub: 'O Futebol é Melhor Junto',
     },
     nextMatch: {
-      title: 'Next Match',
+      title: 'Upcoming Lives',
       loading: 'Loading...',
       error: 'Could not load the next match.',
       watchLive: 'Watch Live',
