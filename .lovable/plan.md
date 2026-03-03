@@ -1,40 +1,31 @@
 
 
-## Problem Analysis
+## Plan: "Proximas Lives" section with two match cards
 
-Two issues found:
+### What changes
 
-### 1. Edge function broadcast doesn't reach OBS
-The `bolinha-comment` edge function (used by AI/quick action buttons) creates a Supabase channel and calls `.send()` **without subscribing first**. Supabase Realtime requires the channel to be subscribed before broadcasting. This means:
-- **Manual sends** from admin work (admin subscribes to the channel on mount, line 153-154)
-- **AI/quick action sends** via the edge function silently fail to broadcast — the message is saved to DB but never reaches the OBS widget
+1. **Translations** (`src/i18n/translations.ts`): Change `nextMatch.title` from "Proximo Jogo" / "Next Match" to "Proximas Lives" / "Upcoming Lives"
 
-### 2. OBS relies solely on broadcast (fragile)
-The OBS widget only listens for broadcast messages. If a broadcast is missed (network hiccup, race condition), the subtitle is lost forever.
+2. **NextMatchSection** (`src/components/NextMatchSection.tsx`): Replace the single `<NextMatchCard />` with two hardcoded match cards side-by-side:
+   - **Palmeiras vs Novorizontino** (Final do Paulista - Jogo 1) with link `https://youtube.com/live/SZNocJ9U6rU?feature=share`
+   - **Sao Paulo vs Chapecoense** with link `https://youtube.com/live/hBuqQbI09qY?feature=share`
 
-## Fix
+3. **NextMatchCard** (`src/presentation/components/match/NextMatchCard.tsx`): Add support for receiving a `fixture` prop directly (static data) instead of always fetching from the API via `useNextMatch`. This allows passing hardcoded match data for Palmeiras and Novorizontino.
 
-### A. Fix edge function broadcast (`supabase/functions/bolinha-comment/index.ts`)
-Subscribe to the channel before sending, then clean up:
+### Approach
 
-```typescript
-// Current (broken):
-await supabase.channel("bolinha").send({ ... });
+Rather than modifying the dynamic `NextMatchCard` heavily, the simplest approach is to build a new `UpcomingLivesSection` directly in `NextMatchSection.tsx` that renders two static match cards with:
+- Team names and logos (fetched from constants or hardcoded with API-Football team IDs: Palmeiras=121, Novorizontino=???, Sao Paulo=126, Chapecoense=???)
+- The specific YouTube links per match
+- Countdown timers if match dates are known
+- "Assistir Live" buttons pointing to the correct YouTube links
 
-// Fixed:
-const channel = supabase.channel("bolinha");
-await channel.subscribe();
-await channel.send({ type: "broadcast", event: "comment", payload: { ... } });
-await supabase.removeChannel(channel);
-```
+Since we need team logos and match dates, the best approach is to use two `NextMatchCard` instances with different `teamId` props and override the `youtubeLink`. The existing hook already supports custom `teamId`.
 
-### B. Add fallback listener in OBS (`src/presentation/pages/obs/ObsBolinha.tsx`)
-Subscribe to **both** broadcast AND `postgres_changes` on `bolinha_messages`. If a broadcast is missed, the DB insert still triggers the widget. The DB row doesn't have `audioBase64` inline, so the OBS will play without audio in the fallback case — but the subtitle and emotion will still appear.
-
-Add a dedup mechanism (track last processed message ID) so the same message isn't played twice when both broadcast and DB trigger fire.
-
-### C. Deploy the edge function
-Redeploy `bolinha-comment` after the fix.
-
-**Files changed**: `supabase/functions/bolinha-comment/index.ts`, `src/presentation/pages/obs/ObsBolinha.tsx`
+### Files modified
+- `src/i18n/translations.ts` — title change
+- `src/components/NextMatchSection.tsx` — render two `NextMatchCard` components:
+  - `<NextMatchCard teamId={TEAMS.PALMEIRAS} youtubeLink="https://youtube.com/live/SZNocJ9U6rU?feature=share" />` 
+  - `<NextMatchCard teamId={TEAMS.SAO_PAULO} youtubeLink="https://youtube.com/live/hBuqQbI09qY?feature=share" />`
+- Layout: stack vertically with gap, or 2-column grid on desktop
 
