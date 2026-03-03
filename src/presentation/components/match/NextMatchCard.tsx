@@ -71,16 +71,18 @@ const CountdownTimer = ({ targetDate }: CountdownTimerProps) => {
 
 interface NextMatchCardProps {
   teamId?: number;
+  leagueId?: number;
   youtubeLink?: string;
   className?: string;
 }
 
 export const NextMatchCard = ({
   teamId,
+  leagueId,
   youtubeLink = 'https://youtube.com/live/k7yPrXmla3M?feature=share',
   className = '',
 }: NextMatchCardProps) => {
-  const { data: fixture, isLoading, error } = useNextMatch({ teamId });
+  const { data: fixture, isLoading, error } = useNextMatch({ teamId, leagueId });
 
   if (isLoading) {
     return (

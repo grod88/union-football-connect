@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { NextMatchCard } from "@/presentation/components/match/NextMatchCard";
 import { useLanguage } from "@/i18n";
-import { TEAMS } from "@/config/constants";
+import { TEAMS, LEAGUES } from "@/config/constants";
 
 const NextMatchSection = () => {
   const { t } = useLanguage();
@@ -20,6 +20,7 @@ const NextMatchSection = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <NextMatchCard
             teamId={TEAMS.PALMEIRAS}
+            leagueId={LEAGUES.PAULISTAO}
             youtubeLink="https://youtube.com/live/SZNocJ9U6rU?feature=share"
           />
           <NextMatchCard
