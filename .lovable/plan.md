@@ -1,23 +1,31 @@
 
 
-## Correção: Próximas Lives com jogos específicos
+## Plan: "Proximas Lives" section with two match cards
 
-### Problema
-O `NextMatchCard` só aceita `teamId`, então busca o próximo jogo genérico do time. O usuário quer especificamente:
-1. **Palmeiras vs Novorizontino** — Final do Paulistão (liga 475)
-2. **São Paulo vs Chapecoense** — próximo jogo do São Paulo
+### What changes
 
-### Alterações
+1. **Translations** (`src/i18n/translations.ts`): Change `nextMatch.title` from "Proximo Jogo" / "Next Match" to "Proximas Lives" / "Upcoming Lives"
 
-**1. `src/presentation/components/match/NextMatchCard.tsx`**
-- Adicionar prop `leagueId` ao componente
-- Passar `leagueId` para o hook `useNextMatch`
+2. **NextMatchSection** (`src/components/NextMatchSection.tsx`): Replace the single `<NextMatchCard />` with two hardcoded match cards side-by-side:
+   - **Palmeiras vs Novorizontino** (Final do Paulista - Jogo 1) with link `https://youtube.com/live/SZNocJ9U6rU?feature=share`
+   - **Sao Paulo vs Chapecoense** with link `https://youtube.com/live/hBuqQbI09qY?feature=share`
 
-**2. `src/components/NextMatchSection.tsx`**
-- Passar `leagueId={LEAGUES.PAULISTAO}` (475) no card do Palmeiras para garantir que busca o jogo da final do Paulistão
-- Manter o card do São Paulo como está (busca genérica pelo próximo jogo)
-- Links do YouTube já estão corretos
+3. **NextMatchCard** (`src/presentation/components/match/NextMatchCard.tsx`): Add support for receiving a `fixture` prop directly (static data) instead of always fetching from the API via `useNextMatch`. This allows passing hardcoded match data for Palmeiras and Novorizontino.
 
-### Resultado
-O card do Palmeiras vai buscar especificamente o próximo jogo do Palmeiras no Paulistão (liga 475), que será a final contra o Novorizontino. O card do São Paulo busca o próximo jogo dele normalmente.
+### Approach
+
+Rather than modifying the dynamic `NextMatchCard` heavily, the simplest approach is to build a new `UpcomingLivesSection` directly in `NextMatchSection.tsx` that renders two static match cards with:
+- Team names and logos (fetched from constants or hardcoded with API-Football team IDs: Palmeiras=121, Novorizontino=???, Sao Paulo=126, Chapecoense=???)
+- The specific YouTube links per match
+- Countdown timers if match dates are known
+- "Assistir Live" buttons pointing to the correct YouTube links
+
+Since we need team logos and match dates, the best approach is to use two `NextMatchCard` instances with different `teamId` props and override the `youtubeLink`. The existing hook already supports custom `teamId`.
+
+### Files modified
+- `src/i18n/translations.ts` — title change
+- `src/components/NextMatchSection.tsx` — render two `NextMatchCard` components:
+  - `<NextMatchCard teamId={TEAMS.PALMEIRAS} youtubeLink="https://youtube.com/live/SZNocJ9U6rU?feature=share" />` 
+  - `<NextMatchCard teamId={TEAMS.SAO_PAULO} youtubeLink="https://youtube.com/live/hBuqQbI09qY?feature=share" />`
+- Layout: stack vertically with gap, or 2-column grid on desktop
 
