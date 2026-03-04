@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import { useFixtureForOBS } from '@/application/hooks/useFixture';
-import { useFixtureLineups } from '@/application/hooks/useFixtureLineups';
+import { useFixtureLineupsForOBS } from '@/application/hooks/useFixtureLineups';
 import { getPlayersByPosition } from '@/core/domain/entities/lineup';
 import type { TeamLineup, Player } from '@/core/domain/entities/lineup';
 import { Users } from 'lucide-react';
@@ -52,7 +52,7 @@ const ObsLineups = () => {
   const fixtureId = Number(searchParams.get('fixture')) || 0;
 
   const { data: fixture } = useFixtureForOBS(fixtureId);
-  const { data: lineups, isLoading } = useFixtureLineups(fixtureId, { enabled: !!fixture });
+  const { data: lineups, isLoading } = useFixtureLineupsForOBS(fixtureId);
 
   if (!fixtureId) return null;
 

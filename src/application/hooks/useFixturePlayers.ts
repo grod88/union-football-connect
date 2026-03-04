@@ -14,6 +14,7 @@ export function useFixturePlayers(fixtureId: number, homeTeamId: number, enabled
     enabled: enabled && fixtureId > 0,
     staleTime: 60 * 1000,
     refetchInterval: enabled ? 2 * 60 * 1000 : false,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: false,
     retry: 1,
   });

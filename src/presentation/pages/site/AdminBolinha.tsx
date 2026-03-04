@@ -87,6 +87,10 @@ export default function AdminBolinha() {
   const [syncAgo, setSyncAgo] = useState('');
   const [syncStale, setSyncStale] = useState(false);
 
+  // Auto-sync
+  const [autoSync, setAutoSync] = useState(false);
+  const autoSyncRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Quick actions
   const [generateAudio, setGenerateAudio] = useState(true);
   const [quickLoading, setQuickLoading] = useState<number | null>(null);
@@ -196,6 +200,23 @@ export default function AdminBolinha() {
       setIsSyncing(false);
     }
   }, [fixtureId]);
+
+  /* ── auto-sync (2 min interval) ── */
+  useEffect(() => {
+    if (autoSync && fixtureId.trim()) {
+      autoSyncRef.current = setInterval(() => {
+        syncMatch();
+      }, 120_000); // 2 minutes
+      // Sync immediately when toggled on
+      syncMatch();
+    }
+    return () => {
+      if (autoSyncRef.current) {
+        clearInterval(autoSyncRef.current);
+        autoSyncRef.current = null;
+      }
+    };
+  }, [autoSync, fixtureId, syncMatch]);
 
   /* ── quick actions (context-aware) ── */
   const homeName = matchContext?.home_team_name || 'Time Casa';
@@ -343,6 +364,18 @@ export default function AdminBolinha() {
                 <div className="flex gap-2 pt-2">
                   <Button onClick={syncMatch} disabled={isSyncing} variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-700">
                     <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} /> Atualizar dados
+                  </Button>
+                  <Button
+                    onClick={() => setAutoSync((prev) => !prev)}
+                    variant="outline"
+                    size="sm"
+                    className={autoSync
+                      ? 'border-green-500 bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                      : 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                    }
+                  >
+                    <RefreshCw className={`w-3 h-3 ${autoSync ? 'animate-spin' : ''}`} />
+                    {autoSync ? '⏹ Auto-sync ON (2min)' : '▶ Auto-sync'}
                   </Button>
                   <Dialog>
                     <DialogTrigger asChild>

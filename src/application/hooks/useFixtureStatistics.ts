@@ -29,6 +29,7 @@ export const useFixtureStatistics = (
     },
     enabled: enabled && !!fixtureId,
     refetchInterval,
+    refetchIntervalInBackground: !!refetchInterval,
     staleTime: 15_000,
   });
 };
