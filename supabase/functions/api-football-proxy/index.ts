@@ -55,10 +55,37 @@ function getCacheTTL(endpoint: string, fixtureStatus?: string | null): number {
   }
 }
 
+// Helper function to fetch from API-Football with error handling
+async function fetchFromAPI(url: string, apiKey: string): Promise<unknown | null> {
+  const response = await fetch(url, {
+    headers: {
+      'x-apisports-key': apiKey,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`API-Football error (${response.status}):`, errorText);
+
+    // Se rate limited, NÃO jogar erro — retornar null
+    // para que o cache stale seja usado
+    if (response.status === 429) {
+      console.warn('[RATE LIMITED] API-Football retornou 429');
+      return null;
+    }
+
+    throw new Error(`API error: ${response.status}`);
+  }
+
+  const json = await response.json();
+  return json;
+}
+
 function isOriginAllowed(origin: string): boolean {
   if (!origin) return false;
   if (origin === "https://unionfc.live" || origin === "https://www.unionfc.live") return true;
-  if (origin === "http://localhost:8080" || origin === "http://localhost:5173") return true;
+  if (origin === "http://localhost:8080" || origin === "http://localhost:5173" || origin === "http://localhost:3000") return true;
+  if (origin.endsWith(".vercel.app") && origin.startsWith("https://")) return true;
   if (origin.endsWith(".lovable.app") && origin.startsWith("https://")) return true;
   if (origin.endsWith(".lovableproject.com") && origin.startsWith("https://")) return true;
   return false;
@@ -110,10 +137,17 @@ serve(async (req) => {
       );
     }
 
-    // --- CACHE LAYER ---
+    // --- CACHE LAYER WITH LOCK + STALE-WHILE-REVALIDATE ---
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Safety net: limpar locks travados (mais de 30s)
+    await supabase
+      .from('api_cache')
+      .update({ is_refreshing: false, refresh_started_at: null })
+      .eq('is_refreshing', true)
+      .lt('refresh_started_at', new Date(Date.now() - 30000).toISOString());
 
     // Build a stable cache key from the endpoint
     const cacheKey = endpoint;
@@ -137,62 +171,173 @@ serve(async (req) => {
       }
     }
 
-    // Check live fixtures endpoint to detect live status from the response's own fixture
     const ttlSeconds = getCacheTTL(endpoint, fixtureStatus);
+    const apiHost = "v3.football.api-sports.io";
+    const apiUrl = `https://${apiHost}${endpoint}`;
 
-    // Check cache
+    // ---- CACHE READ WITH LOCK LOGIC ----
     const { data: cached } = await supabase
       .from('api_cache')
-      .select('data, cached_at')
+      .select('data, cached_at, is_refreshing, refresh_started_at')
       .eq('cache_key', cacheKey)
       .single();
 
+    const now = Date.now();
+
     if (cached?.data && cached?.cached_at) {
-      const age = Date.now() - new Date(cached.cached_at).getTime();
-      if (age < ttlSeconds * 1000) {
-        console.log(`Cache HIT for ${cacheKey} (age: ${Math.round(age/1000)}s, TTL: ${ttlSeconds}s)`);
+      const ageMs = now - new Date(cached.cached_at).getTime();
+      const ttlMs = ttlSeconds * 1000;
+      const staleLimitMs = ttlMs * 5; // stale aceito por até 5x o TTL
+
+      // CASO A: Cache fresco (dentro do TTL) → retorna direto
+      if (ageMs < ttlMs) {
+        console.log(`[CACHE HIT] ${cacheKey} — age: ${Math.round(ageMs/1000)}s, ttl: ${ttlSeconds}s`);
         const cachedData = typeof cached.data === 'string' ? JSON.parse(cached.data) : cached.data;
         return new Response(JSON.stringify(cachedData), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "HIT", "X-Cache-Age": String(Math.round(age/1000)), "X-Cache-TTL": String(ttlSeconds) },
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'X-Cache': 'HIT',
+            'X-Cache-Age': String(Math.round(ageMs / 1000)),
+            'X-Cache-TTL': String(ttlSeconds),
+          },
+        });
+      }
+
+      // CASO B: Cache expirado mas dentro do stale limit
+      if (ageMs < staleLimitMs) {
+        // Verificar se alguém já está fazendo refresh
+        const isLocked = cached.is_refreshing === true &&
+          cached.refresh_started_at &&
+          (now - new Date(cached.refresh_started_at).getTime()) < 30000; // lock timeout 30s
+
+        if (isLocked) {
+          // Outra instância já está buscando → retorna stale sem fazer nada
+          console.log(`[CACHE STALE-LOCKED] ${cacheKey} — outra instância está atualizando`);
+          const cachedData = typeof cached.data === 'string' ? JSON.parse(cached.data) : cached.data;
+          return new Response(JSON.stringify(cachedData), {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+              'X-Cache': 'STALE_LOCKED',
+              'X-Cache-Age': String(Math.round(ageMs / 1000)),
+            },
+          });
+        }
+
+        // Ninguém está buscando → EU vou buscar
+        // Primeiro: adquirir o lock
+        await supabase
+          .from('api_cache')
+          .update({
+            is_refreshing: true,
+            refresh_started_at: new Date().toISOString()
+          })
+          .eq('cache_key', cacheKey);
+
+        console.log(`[CACHE STALE-REFRESH] ${cacheKey} — buscando dados frescos`);
+
+        // Fazer refresh
+        try {
+          const freshData = await fetchFromAPI(apiUrl, apiKey);
+          if (freshData) {
+            await supabase
+              .from('api_cache')
+              .upsert({
+                cache_key: cacheKey,
+                data: freshData,
+                cached_at: new Date().toISOString(),
+                is_refreshing: false,
+                refresh_started_at: null,
+              }, { onConflict: 'cache_key' });
+            console.log(`[CACHE REFRESHED] ${cacheKey}`);
+            // Retornar dado FRESCO
+            return new Response(JSON.stringify(freshData), {
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/json',
+                'X-Cache': 'REFRESHED',
+                'X-Cache-TTL': String(ttlSeconds),
+              },
+            });
+          }
+        } catch (fetchError) {
+          // API falhou → liberar lock e retornar stale
+          console.error(`[CACHE REFRESH FAILED] ${cacheKey}:`, fetchError);
+          await supabase
+            .from('api_cache')
+            .update({ is_refreshing: false, refresh_started_at: null })
+            .eq('cache_key', cacheKey);
+        }
+
+        // Se o refresh falhou ou retornou null (rate limited), retorna stale
+        console.log(`[CACHE STALE-FALLBACK] ${cacheKey} — retornando dado antigo`);
+        const cachedData = typeof cached.data === 'string' ? JSON.parse(cached.data) : cached.data;
+        return new Response(JSON.stringify(cachedData), {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'X-Cache': 'STALE_FALLBACK',
+            'X-Cache-Age': String(Math.round(ageMs / 1000)),
+          },
         });
       }
     }
 
-    // Cache MISS — fetch from API-Football
-    console.log(`Cache MISS for ${cacheKey} (TTL: ${ttlSeconds}s) — fetching from API`);
+    // CASO C: Cache não existe ou stale demais → fetch bloqueante
+    console.log(`[CACHE MISS] ${cacheKey} — buscando da API`);
 
-    const apiHost = "v3.football.api-sports.io";
-    const apiUrl = `https://${apiHost}${endpoint}`;
-
-    console.log(`Proxying request to: ${apiUrl}`);
-
-    const response = await fetch(apiUrl, {
-      method: "GET",
-      headers: {
-        "x-apisports-key": apiKey,
-      },
-    });
-
-    const data = await response.json();
-
-    // Save to cache (upsert)
-    if (response.ok && data) {
+    // Adquirir lock antes de buscar (se já existe entrada no cache)
+    if (cached) {
       await supabase
         .from('api_cache')
-        .upsert({
-          cache_key: cacheKey,
-          data: data,
-          cached_at: new Date().toISOString(),
-        }, { onConflict: 'cache_key' })
-        .then(() => console.log(`Cached ${cacheKey}`))
-        .catch((err: Error) => console.error(`Cache write error:`, err));
+        .update({ is_refreshing: true, refresh_started_at: new Date().toISOString() })
+        .eq('cache_key', cacheKey);
     }
 
-    return new Response(JSON.stringify(data), {
-      status: response.status,
-      headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "MISS", "X-Cache-TTL": String(ttlSeconds) },
-    });
+    try {
+      const data = await fetchFromAPI(apiUrl, apiKey);
+
+      if (data) {
+        // Save to cache (upsert) with lock fields
+        await supabase
+          .from('api_cache')
+          .upsert({
+            cache_key: cacheKey,
+            data: data,
+            cached_at: new Date().toISOString(),
+            is_refreshing: false,
+            refresh_started_at: null,
+          }, { onConflict: 'cache_key' });
+        console.log(`[CACHE STORED] ${cacheKey}`);
+
+        return new Response(JSON.stringify(data), {
+          headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "MISS", "X-Cache-TTL": String(ttlSeconds) },
+        });
+      } else {
+        // API retornou null (provavelmente rate limited)
+        // Liberar lock e retornar erro
+        if (cached) {
+          await supabase
+            .from('api_cache')
+            .update({ is_refreshing: false, refresh_started_at: null })
+            .eq('cache_key', cacheKey);
+        }
+        return new Response(
+          JSON.stringify({ error: "API temporarily unavailable" }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } catch (fetchError) {
+      // Liberar lock em caso de erro
+      if (cached) {
+        await supabase
+          .from('api_cache')
+          .update({ is_refreshing: false, refresh_started_at: null })
+          .eq('cache_key', cacheKey);
+      }
+      throw fetchError;
+    }
   } catch (error) {
     console.error("Proxy error:", error);
     return new Response(
