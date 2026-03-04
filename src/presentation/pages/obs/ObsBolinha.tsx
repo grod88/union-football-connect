@@ -6,12 +6,12 @@ import { OBSLayout } from '@/presentation/components/layout/OBSLayout';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 const EMOTION_IMAGES: Record<string, string> = {
-  neutro: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-NEUTRO-preview.png`,
-  gol: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-GOL-preview.png`,
-  bravo: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-BRAVO-preview.png`,
-  analise: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-ANALISE-preview.png`,
-  sarcastico: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-SARCASTICO-preview.png`,
-  tedio: `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-TEDIO-preview.png`,
+  neutro: `${SUPABASE_URL}/storage/v1/object/public/union-logo/BOLINHA-NEUTRO-preview.png`,
+  gol: `${SUPABASE_URL}/storage/v1/object/public/union-logo/BOLINHA-GOL-preview.png`,
+  bravo: `${SUPABASE_URL}/storage/v1/object/public/union-logo/BOLINHA-BRAVO-preview.png`,
+  analise: `${SUPABASE_URL}/storage/v1/object/public/union-logo/BOLINHA-ANALISE-preview.png`,
+  sarcastico: `${SUPABASE_URL}/storage/v1/object/public/union-logo/BOLINHA-SARCASTICO-preview.png`,
+  tedio: `${SUPABASE_URL}/storage/v1/object/public/union-logo/BOLINHA-TEDIO-preview.png`,
 };
 
 interface BolinhaMessage {

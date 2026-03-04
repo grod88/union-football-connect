@@ -23,7 +23,7 @@ const EMOTIONS = [
 ] as const;
 
 const EMOTION_IMAGE = (emotion: string) =>
-  `${SUPABASE_URL}/storage/v1/object/public/bolinha-images/BOLINHA-${emotion.toUpperCase()}.png`;
+  `${SUPABASE_URL}/storage/v1/object/public/union-logo/BOLINHA-${emotion.toUpperCase()}-preview.png`;
 
 const EMOTION_BADGE_COLORS: Record<string, string> = {
   gol: 'bg-green-500',
