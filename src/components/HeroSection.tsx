@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import heroStadium from "@/assets/hero-stadium.jpg";
-import logoUnion from "@/assets/logo-union.jpg";
 import { Instagram, Youtube, Mail } from "lucide-react";
+
+const logoUnion = "https://ibdmydtnasimlplpojxn.supabase.co/storage/v1/object/public/union-logo/logo-new1.jpeg";
 import { SOCIAL_LINKS } from "@/lib/constants";
 import { useLanguage } from "@/i18n";
 

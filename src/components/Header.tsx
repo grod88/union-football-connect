@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X, Globe } from "lucide-react";
-import logoUnion from "@/assets/logo-union.jpg";
 import { useLanguage } from "@/i18n";
+
+const logoUnion = "https://ibdmydtnasimlplpojxn.supabase.co/storage/v1/object/public/union-logo/logo-new1.jpeg";
 
 const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);

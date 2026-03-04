@@ -1,6 +1,7 @@
 import { Instagram, Youtube, Mail } from "lucide-react";
-import logoUnion from "@/assets/logo-union.jpg";
 import { SOCIAL_LINKS } from "@/lib/constants";
+
+const logoUnion = "https://ibdmydtnasimlplpojxn.supabase.co/storage/v1/object/public/union-logo/logo-new1.jpeg";
 import { useLanguage } from "@/i18n";
 
 const Footer = () => {
