@@ -23,6 +23,7 @@ export const useLiveFixtures = (options: UseLiveFixturesOptions = {}) => {
     queryFn: () => footballRepository.getLiveFixtures(),
     enabled,
     refetchInterval,
+    refetchIntervalInBackground: true,
     staleTime: 10_000,
   });
 };

@@ -41,6 +41,7 @@ export const useFixture = (
 
       return false;
     },
+    refetchIntervalInBackground: true,
     staleTime: 10_000, // Consider data stale after 10 seconds
   });
 };

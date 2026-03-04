@@ -223,27 +223,40 @@ export default function AdminBolinha() {
   const awayName = matchContext?.away_team_name || 'Time Fora';
   const leagueName = matchContext?.league_name || 'campeonato';
 
-  const quickActions = useMemo(() => [
-    { icon: '👋', label: 'Olá galera!', prompt: `Cumprimente a galera da live do Union Football Live! É dia de ${homeName} x ${awayName} pelo ${leagueName}! Diga que o Bolinha tá pronto pra resenha! Use DADOS PRÉ-JOGO se disponíveis.` },
-    { icon: '📊', label: 'Pré-jogo', prompt: `Faça uma análise pré-jogo de ${homeName} x ${awayName}. Use os DADOS PRÉ-JOGO: predição, H2H, lesões e escalações. Traga curiosidades e sua opinião sobre quem leva.` },
-    { icon: '🔮', label: 'Predição', prompt: `Dê seu palpite para ${homeName} x ${awayName}. Use os DADOS PRÉ-JOGO: predição e comparação. Seja opinativo e divertido.` },
-    { icon: '⚽', label: `Gol ${homeName.split(' ')[0]}!`, prompt: `GOL DO ${homeName.toUpperCase()} contra o ${awayName}! Comemora com energia! Use DADOS AO VIVO: placar, chutes no gol, posse. NÃO use predições.` },
-    { icon: '⚽', label: `Gol ${awayName.split(' ')[0]}`, prompt: `Gol do ${awayName} contra o ${homeName}! Comente o gol. Use DADOS AO VIVO: placar, finalizações, posse. NÃO use predições.` },
-    { icon: '🟨', label: 'Cartão!', prompt: `Saiu cartão no jogo ${homeName} x ${awayName}! Use DADOS AO VIVO: total de faltas, cartões já dados, tensão do jogo. NÃO use dados de predição.` },
-    { icon: '😡', label: 'Juiz errou!', prompt: `O juiz errou feio em ${homeName} x ${awayName}! Lance polêmico! Fique indignado! Use DADOS AO VIVO se disponíveis.` },
-    { icon: '👏', label: 'Que jogada!', prompt: `Que jogada linda em ${homeName} x ${awayName}! Elogie a qualidade técnica. Use DADOS AO VIVO.` },
-    { icon: '😴', label: 'Jogo parado', prompt: `O jogo ${homeName} x ${awayName} tá sem emoção. Use DADOS AO VIVO: chutes no gol, finalizações, posse pra justificar o tédio.` },
-    { icon: '📊', label: 'Intervalo', prompt: `É intervalo em ${homeName} x ${awayName} pelo ${leagueName}. Faça um resumo do primeiro tempo. Use DADOS AO VIVO: posse, finalizações, chutes no gol, escanteios, faltas, eventos.` },
-    { icon: '🏥', label: 'Desfalques', prompt: `Comente sobre os desfalques e lesões no jogo ${homeName} x ${awayName}. Use DADOS PRÉ-JOGO: lista de jogadores lesionados.` },
-    { icon: '🏁', label: 'Fim de jogo!', prompt: `Acabou ${homeName} x ${awayName} pelo ${leagueName}! Dê seu veredito final. Use DADOS AO VIVO: placar, posse, finalizações, eventos do jogo.` },
-  ], [homeName, awayName, leagueName]);
+  const quickActions = useMemo(() => ({
+    preGame: [
+      { icon: '👋', label: 'Olá galera!', prompt: `Cumprimente a galera da live do Union Football Live! É dia de ${homeName} x ${awayName} pelo ${leagueName}! Diga que o Bolinha tá pronto pra resenha! Use DADOS PRÉ-JOGO se disponíveis.` },
+      { icon: '📊', label: 'Pré-jogo', prompt: `Faça uma análise pré-jogo de ${homeName} x ${awayName}. Use os DADOS PRÉ-JOGO: predição, H2H, lesões e escalações. Traga curiosidades e sua opinião sobre quem leva.` },
+      { icon: '🔮', label: 'Predição', prompt: `Dê seu palpite para ${homeName} x ${awayName}. Use os DADOS PRÉ-JOGO: predição e comparação. Seja opinativo e divertido.` },
+      { icon: '🏥', label: 'Desfalques', prompt: `Comente sobre os desfalques e lesões no jogo ${homeName} x ${awayName}. Use DADOS PRÉ-JOGO: lista de jogadores lesionados.` },
+    ],
+    live: [
+      { icon: '⚽', label: `Gol ${homeName.split(' ')[0]}!`, prompt: `GOL DO ${homeName.toUpperCase()} contra o ${awayName}! Comemora com energia! Use DADOS AO VIVO: placar, chutes no gol, posse. NÃO use predições.` },
+      { icon: '⚽', label: `Gol ${awayName.split(' ')[0]}`, prompt: `Gol do ${awayName} contra o ${homeName}! Comente o gol. Use DADOS AO VIVO: placar, finalizações, posse. NÃO use predições.` },
+      { icon: '🟨', label: 'Cartão!', prompt: `Saiu cartão no jogo ${homeName} x ${awayName}! Use DADOS AO VIVO: total de faltas, cartões já dados, tensão do jogo. NÃO use dados de predição.` },
+      { icon: '😡', label: 'Juiz errou!', prompt: `O juiz errou feio em ${homeName} x ${awayName}! Lance polêmico! Fique indignado! Use DADOS AO VIVO se disponíveis.` },
+      { icon: '👏', label: 'Que jogada!', prompt: `Que jogada linda em ${homeName} x ${awayName}! Elogie a qualidade técnica. Use DADOS AO VIVO.` },
+      { icon: '😴', label: 'Jogo parado', prompt: `O jogo ${homeName} x ${awayName} tá sem emoção. Use DADOS AO VIVO: chutes no gol, finalizações, posse pra justificar o tédio.` },
+    ],
+    postGame: [
+      { icon: '📊', label: 'Intervalo', prompt: `É intervalo em ${homeName} x ${awayName} pelo ${leagueName}. Faça um resumo do primeiro tempo. Use DADOS AO VIVO: posse, finalizações, chutes no gol, escanteios, faltas, eventos.` },
+      { icon: '🏁', label: 'Fim de jogo!', prompt: `Acabou ${homeName} x ${awayName} pelo ${leagueName}! Dê seu veredito final. Use DADOS AO VIVO: placar, posse, finalizações, eventos do jogo.` },
+    ],
+  }), [homeName, awayName, leagueName]);
+
+  // Flat list for index-based handler
+  const allQuickActions = useMemo(() => [
+    ...quickActions.preGame,
+    ...quickActions.live,
+    ...quickActions.postGame,
+  ], [quickActions]);
 
   /* ── handlers ── */
   const handleQuickAction = useCallback(async (idx: number) => {
     setQuickLoading(idx);
     try {
       const res = await supabase.functions.invoke('bolinha-comment', {
-        body: { custom_prompt: quickActions[idx].prompt, generate_audio: generateAudio },
+        body: { custom_prompt: allQuickActions[idx].prompt, generate_audio: generateAudio },
       });
       setLastGenerated(res.data?.text || '');
     } catch (e) {
@@ -251,7 +264,7 @@ export default function AdminBolinha() {
     } finally {
       setQuickLoading(null);
     }
-  }, [quickActions, generateAudio]);
+  }, [allQuickActions, generateAudio]);
 
   const sendManual = useCallback(async () => {
     if (!manualText.trim()) return;
@@ -425,22 +438,77 @@ export default function AdminBolinha() {
               <Checkbox id="quick-tts" checked={generateAudio} onCheckedChange={(c) => setGenerateAudio(!!c)} />
               <Label htmlFor="quick-tts" className="text-gray-400 text-sm cursor-pointer">🔊 Gerar com áudio (TTS)</Label>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {quickActions.map((action, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleQuickAction(idx)}
-                  disabled={quickLoading !== null}
-                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-yellow-500/50 rounded-lg p-3 text-center transition-all duration-200 disabled:opacity-50 relative"
-                >
-                  {quickLoading === idx ? (
-                    <Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-yellow-500" />
-                  ) : (
-                    <span className="text-xl block mb-1">{action.icon}</span>
-                  )}
-                  <span className="text-gray-300 text-xs">{action.label}</span>
-                </button>
-              ))}
+
+            {/* PRÉ-JOGO */}
+            <div>
+              <p className="text-xs font-bold text-yellow-500 mb-1.5 uppercase tracking-wider">📋 Pré-jogo</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {quickActions.preGame.map((action, idx) => (
+                  <button
+                    key={`pre-${idx}`}
+                    onClick={() => handleQuickAction(idx)}
+                    disabled={quickLoading !== null}
+                    className="bg-gray-800 hover:bg-gray-700 border border-yellow-500/20 hover:border-yellow-500/50 rounded-lg p-3 text-center transition-all duration-200 disabled:opacity-50 relative"
+                  >
+                    {quickLoading === idx ? (
+                      <Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-yellow-500" />
+                    ) : (
+                      <span className="text-xl block mb-1">{action.icon}</span>
+                    )}
+                    <span className="text-gray-300 text-xs">{action.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* AO VIVO */}
+            <div>
+              <p className="text-xs font-bold text-green-500 mb-1.5 uppercase tracking-wider">⚡ Ao vivo</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {quickActions.live.map((action, idx) => {
+                  const globalIdx = quickActions.preGame.length + idx;
+                  return (
+                    <button
+                      key={`live-${idx}`}
+                      onClick={() => handleQuickAction(globalIdx)}
+                      disabled={quickLoading !== null}
+                      className="bg-gray-800 hover:bg-gray-700 border border-green-500/20 hover:border-green-500/50 rounded-lg p-3 text-center transition-all duration-200 disabled:opacity-50 relative"
+                    >
+                      {quickLoading === globalIdx ? (
+                        <Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-green-500" />
+                      ) : (
+                        <span className="text-xl block mb-1">{action.icon}</span>
+                      )}
+                      <span className="text-gray-300 text-xs">{action.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* INTERVALO / FIM */}
+            <div>
+              <p className="text-xs font-bold text-blue-400 mb-1.5 uppercase tracking-wider">🏁 Intervalo / Fim</p>
+              <div className="grid grid-cols-2 md:grid-cols-2 gap-2">
+                {quickActions.postGame.map((action, idx) => {
+                  const globalIdx = quickActions.preGame.length + quickActions.live.length + idx;
+                  return (
+                    <button
+                      key={`post-${idx}`}
+                      onClick={() => handleQuickAction(globalIdx)}
+                      disabled={quickLoading !== null}
+                      className="bg-gray-800 hover:bg-gray-700 border border-blue-400/20 hover:border-blue-400/50 rounded-lg p-3 text-center transition-all duration-200 disabled:opacity-50 relative"
+                    >
+                      {quickLoading === globalIdx ? (
+                        <Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-blue-400" />
+                      ) : (
+                        <span className="text-xl block mb-1">{action.icon}</span>
+                      )}
+                      <span className="text-gray-300 text-xs">{action.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </CardContent>
         </Card>

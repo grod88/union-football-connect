@@ -495,3 +495,27 @@ https://unionfc.live/admin/bolinha               → Painel de controle (navegad
 ---
 
 *Testado e verificado em 28/02/2026 — Todos os 16 widgets + Admin Bolinha funcionando ✅*
+
+
+
+
+
+
+  URLs de Teste (substituir <FIXTURE_ID> por um ID válido como 1526432):
+
+  | Widget        | URL                                     |
+  |---------------|-----------------------------------------|
+  | Placar        | /obs/placar?fixture=<FIXTURE_ID>        |
+  | Estatísticas  | /obs/stats?fixture=<FIXTURE_ID>         |
+  | Eventos       | /obs/eventos?fixture=<FIXTURE_ID>       |
+  | Score         | /obs/score?fixture=<FIXTURE_ID>         |
+  | Tempo         | /obs/tempo?fixture=<FIXTURE_ID>         |
+  | Escalação     | /obs/escalacao?fixture=<FIXTURE_ID>     |
+  | Ratings       | /obs/ratings?fixture=<FIXTURE_ID>       |
+  | H2H           | /obs/h2h?fixture=<FIXTURE_ID>           |
+  | Classificação | /obs/classificacao?fixture=<FIXTURE_ID> |
+  | Predição      | /obs/predicao?fixture=<FIXTURE_ID>      |
+
+  Para testar o cache:
+
+
