@@ -15,12 +15,17 @@ export interface ApiResponse<T> {
   response: T;
 }
 
+export interface ApiRequestOptions {
+  live?: boolean;
+}
+
 export class ApiFootballClient {
-  async get<T>(endpoint: string): Promise<ApiResponse<T>> {
+  async get<T>(endpoint: string, options?: ApiRequestOptions): Promise<ApiResponse<T>> {
     try {
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const functionUrl = `https://${projectId}.supabase.co/functions/v1/api-football-proxy?endpoint=${encodeURIComponent(endpoint)}`;
+      let functionUrl = `https://${projectId}.supabase.co/functions/v1/api-football-proxy?endpoint=${encodeURIComponent(endpoint)}`;
+      if (options?.live) functionUrl += '&live=true';
 
       const response = await fetch(functionUrl, {
         method: 'GET',

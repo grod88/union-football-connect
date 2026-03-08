@@ -31,10 +31,17 @@ export const useFixtureLineups = (
   });
 };
 
-// Hook for OBS pages with guaranteed polling
+// Hook for OBS pages with guaranteed polling + live mode (ultra-low cache)
 export const useFixtureLineupsForOBS = (fixtureId: number | undefined, enabled: boolean = true) => {
-  return useFixtureLineups(fixtureId, {
-    enabled,
-    refetchInterval: REFRESH_INTERVALS.LIVE_FIXTURE, // 15s
+  return useQuery<FixtureLineups | null, Error>({
+    queryKey: ['fixture-lineups-obs', fixtureId],
+    queryFn: () => {
+      if (!fixtureId) return null;
+      return footballRepository.getFixtureLineups(fixtureId, { live: true });
+    },
+    enabled: enabled && !!fixtureId,
+    refetchInterval: 30_000,           // 30s — lineups change less frequently
+    refetchIntervalInBackground: true,
+    staleTime: 0,
   });
 };

@@ -46,10 +46,17 @@ export const useFixture = (
   });
 };
 
-// Hook for OBS pages with guaranteed polling
+// Hook for OBS pages with guaranteed polling + live mode (ultra-low cache)
 export const useFixtureForOBS = (fixtureId: number | undefined) => {
-  return useFixture(fixtureId, {
-    refetchInterval: REFRESH_INTERVALS.LIVE_FIXTURE,
-    autoRefreshWhenLive: false,
+  return useQuery<Fixture | null, Error>({
+    queryKey: ['fixture-obs', fixtureId],
+    queryFn: () => {
+      if (!fixtureId) return null;
+      return footballRepository.getFixtureById(fixtureId, { live: true });
+    },
+    enabled: !!fixtureId,
+    refetchInterval: 10_000,           // 10s — real-time for OBS
+    refetchIntervalInBackground: true, // Essential: OBS tab is never focused
+    staleTime: 0,                      // Always consider stale
   });
 };

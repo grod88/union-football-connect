@@ -14,7 +14,7 @@ import type { PlayerFixtureStats } from '@/core/domain/entities/player-fixture-s
 import type { TopScorer } from '@/core/domain/entities/top-scorer';
 import type { TeamSeasonStats } from '@/core/domain/entities/team-season-stats';
 
-import { apiFootballClient } from './client';
+import { apiFootballClient, type ApiRequestOptions } from './client';
 import { ENDPOINTS } from '@/config/api.config';
 import { CURRENT_SEASON } from '@/config/constants';
 
@@ -43,9 +43,9 @@ import { mapTeamSeasonStatsFromDTO } from './mappers/team-season-stats.mapper';
 export class ApiFootballRepository implements IFootballRepository {
   // ==================== Fixtures ====================
 
-  async getFixtureById(id: number): Promise<Fixture | null> {
+  async getFixtureById(id: number, options?: ApiRequestOptions): Promise<Fixture | null> {
     try {
-      const response = await apiFootballClient.get<FixtureDTO[]>(ENDPOINTS.fixtureById(id));
+      const response = await apiFootballClient.get<FixtureDTO[]>(ENDPOINTS.fixtureById(id), options);
 
       if (response.results === 0 || !response.response[0]) {
         return null;
@@ -119,10 +119,10 @@ export class ApiFootballRepository implements IFootballRepository {
 
   // ==================== Statistics ====================
 
-  async getFixtureStatistics(fixtureId: number): Promise<FixtureStatistics | null> {
+  async getFixtureStatistics(fixtureId: number, options?: ApiRequestOptions): Promise<FixtureStatistics | null> {
     try {
       const response = await apiFootballClient.get<StatisticsDTO[]>(
-        ENDPOINTS.fixtureStatistics(fixtureId)
+        ENDPOINTS.fixtureStatistics(fixtureId), options
       );
 
       if (response.results === 0) {
@@ -138,10 +138,10 @@ export class ApiFootballRepository implements IFootballRepository {
 
   // ==================== Events ====================
 
-  async getFixtureEvents(fixtureId: number): Promise<FixtureEvent[]> {
+  async getFixtureEvents(fixtureId: number, options?: ApiRequestOptions): Promise<FixtureEvent[]> {
     try {
       const response = await apiFootballClient.get<EventDTO[]>(
-        ENDPOINTS.fixtureEvents(fixtureId)
+        ENDPOINTS.fixtureEvents(fixtureId), options
       );
 
       return mapEventsFromDTO(fixtureId, response.response);
@@ -153,10 +153,10 @@ export class ApiFootballRepository implements IFootballRepository {
 
   // ==================== Lineups ====================
 
-  async getFixtureLineups(fixtureId: number): Promise<FixtureLineups | null> {
+  async getFixtureLineups(fixtureId: number, options?: ApiRequestOptions): Promise<FixtureLineups | null> {
     try {
       const response = await apiFootballClient.get<LineupDTO[]>(
-        ENDPOINTS.fixtureLineups(fixtureId)
+        ENDPOINTS.fixtureLineups(fixtureId), options
       );
 
       if (response.results === 0) {

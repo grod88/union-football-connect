@@ -19,7 +19,18 @@ const ALLOWED_ENDPOINT_PREFIXES = [
 
 const LIVE_STATUSES = ['1H', '2H', 'HT', 'ET', 'P', 'BT', 'LIVE', 'INT'];
 
-function getCacheTTL(endpoint: string, fixtureStatus?: string | null): number {
+function getCacheTTL(endpoint: string, fixtureStatus?: string | null, isLiveMode: boolean = false): number {
+  // ── LIVE MODE (OBS widgets): cache ultra-curto ──
+  if (isLiveMode) {
+    if (endpoint.startsWith('/fixtures/statistics')) return 10;  // 10s
+    if (endpoint.startsWith('/fixtures/events')) return 10;      // 10s
+    if (endpoint.startsWith('/fixtures/players')) return 20;     // 20s
+    if (endpoint.startsWith('/fixtures/lineups')) return 30;     // 30s
+    if (endpoint.startsWith('/fixtures')) return 10;             // 10s (placar)
+    if (endpoint.startsWith('/standings')) return 60;            // 1min
+    return 15;
+  }
+
   const isLive = LIVE_STATUSES.includes(fixtureStatus || '');
 
   // Dados estáticos — cache longo sempre
@@ -171,9 +182,14 @@ serve(async (req) => {
       }
     }
 
-    const ttlSeconds = getCacheTTL(endpoint, fixtureStatus);
+    const isLiveMode = url.searchParams.get('live') === 'true';
+    const ttlSeconds = getCacheTTL(endpoint, fixtureStatus, isLiveMode);
     const apiHost = "v3.football.api-sports.io";
     const apiUrl = `https://${apiHost}${endpoint}`;
+
+    if (isLiveMode) {
+      console.log(`[LIVE MODE] ${cacheKey} — TTL: ${ttlSeconds}s`);
+    }
 
     // ---- CACHE READ WITH LOCK LOGIC ----
     const { data: cached } = await supabase

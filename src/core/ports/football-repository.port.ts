@@ -14,18 +14,23 @@ import type { PlayerFixtureStats } from '../domain/entities/player-fixture-stats
 import type { TopScorer } from '../domain/entities/top-scorer';
 import type { TeamSeasonStats } from '../domain/entities/team-season-stats';
 
+/** Options for API requests (e.g., live mode for OBS widgets) */
+export interface RepositoryRequestOptions {
+  live?: boolean;
+}
+
 export interface IFootballRepository {
   // Fixture queries
-  getFixtureById(id: number): Promise<Fixture | null>;
+  getFixtureById(id: number, options?: RepositoryRequestOptions): Promise<Fixture | null>;
   getFixturesByTeam(teamId: number, options?: { next?: number; last?: number; leagueId?: number; season?: number }): Promise<Fixture[]>;
   getFixturesByLeague(leagueId: number, season: number): Promise<Fixture[]>;
   getLiveFixtures(): Promise<Fixture[]>;
   getFixturesByDate(date: string): Promise<Fixture[]>;
 
   // Fixture details
-  getFixtureStatistics(fixtureId: number): Promise<FixtureStatistics | null>;
-  getFixtureEvents(fixtureId: number): Promise<FixtureEvent[]>;
-  getFixtureLineups(fixtureId: number): Promise<FixtureLineups | null>;
+  getFixtureStatistics(fixtureId: number, options?: RepositoryRequestOptions): Promise<FixtureStatistics | null>;
+  getFixtureEvents(fixtureId: number, options?: RepositoryRequestOptions): Promise<FixtureEvent[]>;
+  getFixtureLineups(fixtureId: number, options?: RepositoryRequestOptions): Promise<FixtureLineups | null>;
 
   // Standings
   getStandings(leagueId: number, season: number): Promise<LeagueStandings | null>;
