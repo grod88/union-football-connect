@@ -196,8 +196,12 @@ serve(async (req) => {
     let contextBlock = "";
 
     if (activeMatch) {
-      const hasLiveData = activeMatch.live_summary &&
-        activeMatch.live_summary.includes("EVENTOS DO JOGO");
+      // Detect live data: check for any indicator that match is in progress
+      const ls = activeMatch.live_summary || "";
+      const hasLiveData = ls.includes("PLACAR ATUAL") ||
+        ls.includes("ESTATÍSTICAS AO VIVO") ||
+        ls.includes("EVENTOS DO JOGO") ||
+        ls.includes("STATUS:");
 
       if (hasLiveData) {
         // Match is live — ONLY live data, NO pre-match predictions
