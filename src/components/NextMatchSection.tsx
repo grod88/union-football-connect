@@ -3,6 +3,8 @@ import { NextMatchCard } from "@/presentation/components/match/NextMatchCard";
 import { useLanguage } from "@/i18n";
 import { TEAMS } from "@/config/constants";
 
+const YOUTUBE_LIVE_LINK = "https://www.youtube.com/live/jvFpLbkGb68?si=fQtDIp1LRvOQ7KsT";
+
 const NextMatchSection = () => {
   const { t } = useLanguage();
 
@@ -19,12 +21,12 @@ const NextMatchSection = () => {
         </motion.h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <NextMatchCard
-            teamId={TEAMS.PALMEIRAS}
-            youtubeLink="https://youtube.com/live/SZNocJ9U6rU?feature=share"
+            teamId={TEAMS.FLAMENGO}
+            youtubeLink={YOUTUBE_LIVE_LINK}
           />
           <NextMatchCard
-            teamId={TEAMS.SAO_PAULO}
-            youtubeLink="https://youtube.com/live/hBuqQbI09qY?feature=share"
+            teamId={TEAMS.PALMEIRAS}
+            youtubeLink={YOUTUBE_LIVE_LINK}
           />
         </div>
       </div>
