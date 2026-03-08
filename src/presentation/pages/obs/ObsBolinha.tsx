@@ -83,6 +83,7 @@ const ObsBolinha = () => {
   const messageTimerRef = useRef<number | null>(null);
   const enterTimerRef = useRef<number | null>(null);
   const blockIntervalRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastProcessedRef = useRef<string | null>(null);
   const broadcastReceivedRef = useRef<number>(0);
@@ -99,6 +100,7 @@ const ObsBolinha = () => {
     if (messageTimerRef.current) { clearTimeout(messageTimerRef.current); messageTimerRef.current = null; }
     if (enterTimerRef.current) { clearTimeout(enterTimerRef.current); enterTimerRef.current = null; }
     if (blockIntervalRef.current) { clearInterval(blockIntervalRef.current); blockIntervalRef.current = null; }
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
   }, []);
 
   const resetBolinha = useCallback(() => {
@@ -129,6 +131,25 @@ const ObsBolinha = () => {
     }, timePerBlock);
   }, []);
 
+  /* Sync subtitles to audio currentTime using requestAnimationFrame */
+  const startAudioSyncedSubtitles = useCallback((audio: HTMLAudioElement, blocks: string[], duration: number) => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (blockIntervalRef.current) { clearInterval(blockIntervalRef.current); blockIntervalRef.current = null; }
+
+    const timePerBlock = duration / blocks.length;
+
+    const tick = () => {
+      if (audio.paused && audio.currentTime > 0) return; // audio ended
+      const newIdx = Math.min(
+        Math.floor(audio.currentTime / timePerBlock),
+        blocks.length - 1
+      );
+      setCurrentBlockIndex(newIdx);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }, []);
+
   const handleNewMessage = useCallback((msg: BolinhaMessage, dedupKey?: string) => {
     // Dedup: skip if we already processed this message
     const key = dedupKey || msg.text + (msg.timestamp || '');
@@ -156,29 +177,45 @@ const ObsBolinha = () => {
       setAnimClass(EMOTION_ANIM_MAP[msg.emotion] || 'bolinha-idle');
     }, 600);
 
-    // 3. Audio handling
+    // 3. Audio handling — sync subtitles to audio playback
     if (msg.audioBase64) {
       try {
         const audio = new Audio(msg.audioBase64);
         audioRef.current = audio;
 
         audio.addEventListener('ended', () => {
+          if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
           resetBolinha();
         });
         audio.addEventListener('error', () => {
+          if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
           resetBolinha();
         });
 
-        audio.play().then(() => {
-          if (audio.duration && isFinite(audio.duration)) {
-            const timePerBlock = Math.max(2000, (audio.duration * 1000) / blocks.length);
-            startSubtitleCycle(blocks, timePerBlock);
+        // Wait for duration to be available, then sync subtitles
+        const startSynced = (duration: number) => {
+          if (duration && isFinite(duration) && duration > 0) {
+            startAudioSyncedSubtitles(audio, blocks, duration);
           } else {
-            audio.addEventListener('loadedmetadata', () => {
-              const timePerBlock = Math.max(2000, (audio.duration * 1000) / blocks.length);
-              startSubtitleCycle(blocks, timePerBlock);
-            }, { once: true });
+            // Fallback: fixed interval
             startSubtitleCycle(blocks, 3000);
+          }
+        };
+
+        audio.play().then(() => {
+          if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+            startSynced(audio.duration);
+          } else {
+            // Duration not ready yet — wait for it
+            audio.addEventListener('loadedmetadata', () => {
+              startSynced(audio.duration);
+            }, { once: true });
+            // Also try durationchange as backup
+            audio.addEventListener('durationchange', () => {
+              if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+                startSynced(audio.duration);
+              }
+            }, { once: true });
           }
         }).catch(() => {
           startSubtitleCycle(blocks, 3000);
@@ -186,7 +223,8 @@ const ObsBolinha = () => {
           messageTimerRef.current = window.setTimeout(resetBolinha, totalDuration);
         });
 
-        messageTimerRef.current = window.setTimeout(resetBolinha, 30000);
+        // Safety timeout: 60s max (some audios are long)
+        messageTimerRef.current = window.setTimeout(resetBolinha, 60000);
       } catch {
         startSubtitleCycle(blocks, 3000);
         const totalDuration = blocks.length * 3000 + 1000;
@@ -197,7 +235,7 @@ const ObsBolinha = () => {
       const totalDuration = blocks.length * 3000 + 1000;
       messageTimerRef.current = window.setTimeout(resetBolinha, totalDuration);
     }
-  }, [clearAllTimers, resetBolinha, startSubtitleCycle]);
+  }, [clearAllTimers, resetBolinha, startSubtitleCycle, startAudioSyncedSubtitles]);
 
   // Subscribe to Realtime
   useEffect(() => {
