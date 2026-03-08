@@ -4,12 +4,11 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Loader2, Send, Bot, Zap, RefreshCw, Eye, Satellite } from 'lucide-react';
+import { Loader2, Send, Bot, Zap, RefreshCw, Eye, Satellite, Copy, Link } from 'lucide-react';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -34,12 +33,23 @@ const EMOTION_BADGE_COLORS: Record<string, string> = {
   neutro: 'bg-gray-600',
 };
 
+/* Jogos fixos da live de hoje */
+const TODAYS_MATCHES = [
+  { id: 1528849, label: 'Flu × Fla', home: 'Fluminense', away: 'Flamengo', league: 'Carioca Final', emoji: '🔴⚫' },
+  { id: 1528825, label: 'Nov × Pal', home: 'Novorizontino', away: 'Palmeiras', league: 'Paulistão Final', emoji: '🟢⚪' },
+] as const;
+
+const FIXTURE_LABELS: Record<number, string> = Object.fromEntries(
+  TODAYS_MATCHES.map((m) => [m.id, m.label])
+);
+
 interface HistoryMessage {
   id: string;
   text: string;
   emotion: string;
   created_at: string | null;
   event_type: string | null;
+  fixture_id: number | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -110,6 +120,9 @@ export default function AdminBolinha() {
   // History
   const [history, setHistory] = useState<HistoryMessage[]>([]);
 
+  // OBS URLs
+  const [showObsUrls, setShowObsUrls] = useState(false);
+
   // Broadcast channel
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -134,7 +147,7 @@ export default function AdminBolinha() {
     const fetchHistory = async () => {
       const { data } = await supabase
         .from('bolinha_messages')
-        .select('id, text, emotion, created_at, event_type')
+        .select('id, text, emotion, created_at, event_type, fixture_id')
         .order('created_at', { ascending: false })
         .limit(20);
       if (data) setHistory(data);
@@ -335,14 +348,22 @@ export default function AdminBolinha() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Fixture ID input + sync */}
-            <div className="flex gap-2">
-              <Input
-                placeholder="Fixture ID (ex: 1526432)"
-                value={fixtureId}
-                onChange={(e) => setFixtureId(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 max-w-[200px]"
-              />
+            {/* Fixed match selector */}
+            <div className="flex flex-wrap gap-2">
+              {TODAYS_MATCHES.map((match) => (
+                <Button
+                  key={match.id}
+                  onClick={() => { setFixtureId(String(match.id)); }}
+                  variant="outline"
+                  className={`font-bold transition-all ${
+                    fixtureId === String(match.id)
+                      ? 'border-yellow-500 bg-yellow-500/20 text-yellow-400 ring-1 ring-yellow-500'
+                      : 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  {match.emoji} {match.home} × {match.away}
+                </Button>
+              ))}
               <Button onClick={syncMatch} disabled={isSyncing || !fixtureId.trim()} className="bg-blue-600 hover:bg-blue-700 text-white font-bold">
                 {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 SINCRONIZAR
@@ -424,6 +445,84 @@ export default function AdminBolinha() {
               <p className="text-gray-500 text-sm">Nenhuma partida ativa. Insira um Fixture ID e sincronize.</p>
             )}
           </CardContent>
+        </Card>
+
+        {/* ═══════ OBS URLS ═══════ */}
+        <Card className="bg-gray-900 border-gray-800">
+          <CardHeader className="pb-2 cursor-pointer" onClick={() => setShowObsUrls(p => !p)}>
+            <CardTitle className="text-lg text-white flex items-center gap-2 font-['Oswald']">
+              <Link className="w-5 h-5 text-cyan-400" /> URLs OBS — COPIAR E COLAR
+              <span className="text-xs text-gray-500 ml-auto">{showObsUrls ? '▲ fechar' : '▼ abrir'}</span>
+            </CardTitle>
+          </CardHeader>
+          {showObsUrls && (
+            <CardContent className="space-y-4">
+              {TODAYS_MATCHES.map((match) => {
+                const BASE = typeof window !== 'undefined' ? window.location.origin : '';
+                const widgets = [
+                  { label: '⚽ Placar', path: `/obs/placar?fixture=${match.id}` },
+                  { label: '📊 Estatísticas', path: `/obs/stats?fixture=${match.id}` },
+                  { label: '📋 Eventos', path: `/obs/eventos?fixture=${match.id}` },
+                  { label: '🏟️ Campo', path: `/obs/campo?fixture=${match.id}` },
+                  { label: '🏠 Escudo Casa', path: `/obs/home?fixture=${match.id}` },
+                  { label: '✈️ Escudo Fora', path: `/obs/away?fixture=${match.id}` },
+                  { label: '🔢 Score', path: `/obs/score?fixture=${match.id}` },
+                  { label: '⏱ Tempo', path: `/obs/tempo?fixture=${match.id}` },
+                  { label: '⭐ Ratings', path: `/obs/ratings?fixture=${match.id}` },
+                  { label: '📝 Escalação', path: `/obs/escalacao?fixture=${match.id}` },
+                  { label: '🏆 Classificação', path: `/obs/classificacao?fixture=${match.id}` },
+                  { label: '🔮 Predição', path: `/obs/predicao?fixture=${match.id}` },
+                  { label: '⚔️ H2H', path: `/obs/h2h?fixture=${match.id}` },
+                  { label: '🏥 Desfalques', path: `/obs/desfalques?fixture=${match.id}` },
+                ];
+                return (
+                  <div key={match.id} className="space-y-2">
+                    <h3 className="text-sm font-bold text-white font-['Oswald'] flex items-center gap-2">
+                      {match.emoji} {match.home} × {match.away}
+                      <span className="text-gray-500 text-xs font-normal">ID: {match.id}</span>
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                      {widgets.map((w) => {
+                        const fullUrl = `${BASE}${w.path}`;
+                        return (
+                          <button
+                            key={w.path}
+                            onClick={() => { navigator.clipboard.writeText(fullUrl); toast.success(`Copiado: ${w.label}`); }}
+                            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-cyan-500/50 rounded px-3 py-1.5 text-xs text-left transition-all group"
+                          >
+                            <span className="whitespace-nowrap">{w.label}</span>
+                            <span className="text-gray-500 truncate flex-1 font-mono text-[10px]">{w.path}</span>
+                            <Copy className="w-3 h-3 text-gray-600 group-hover:text-cyan-400 shrink-0" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Bolinha (sem fixture) */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold text-white font-['Oswald']">🎾 Bolinha (global)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                  {['sm', 'md', 'lg'].map((sz) => {
+                    const BASE = typeof window !== 'undefined' ? window.location.origin : '';
+                    const p = `/obs/bolinha?size=${sz}`;
+                    return (
+                      <button
+                        key={sz}
+                        onClick={() => { navigator.clipboard.writeText(`${BASE}${p}`); toast.success(`Copiado: Bolinha ${sz}`); }}
+                        className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-cyan-500/50 rounded px-3 py-1.5 text-xs text-left transition-all group"
+                      >
+                        <span>🎾 Bolinha ({sz})</span>
+                        <span className="text-gray-500 truncate flex-1 font-mono text-[10px]">{p}</span>
+                        <Copy className="w-3 h-3 text-gray-600 group-hover:text-cyan-400 shrink-0" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </CardContent>
+          )}
         </Card>
 
         {/* ═══════ 2. ATALHOS RÁPIDOS ═══════ */}
@@ -612,6 +711,11 @@ export default function AdminBolinha() {
                   {history.map((msg) => (
                     <div key={msg.id} className="flex items-center gap-2 text-xs border-b border-gray-800 pb-1.5">
                       <span className="text-gray-500 font-mono whitespace-nowrap">{formatTime(msg.created_at)}</span>
+                      {msg.fixture_id && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 border-gray-600 text-gray-400 whitespace-nowrap">
+                          {FIXTURE_LABELS[msg.fixture_id] || msg.fixture_id}
+                        </Badge>
+                      )}
                       <Badge className={`${EMOTION_BADGE_COLORS[msg.emotion] || 'bg-gray-600'} text-white text-[10px] px-1.5 py-0`}>{msg.emotion}</Badge>
                       <span className="text-gray-300 truncate">{msg.text}</span>
                     </div>
