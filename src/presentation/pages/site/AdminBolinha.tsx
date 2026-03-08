@@ -234,7 +234,7 @@ export default function AdminBolinha() {
       { icon: '⚽', label: `Gol ${homeName.split(' ')[0]}!`, prompt: `GOL DO ${homeName.toUpperCase()} contra o ${awayName}! Comemora com energia! Use DADOS AO VIVO: placar, chutes no gol, posse. NÃO use predições.` },
       { icon: '⚽', label: `Gol ${awayName.split(' ')[0]}`, prompt: `Gol do ${awayName} contra o ${homeName}! Comente o gol. Use DADOS AO VIVO: placar, finalizações, posse. NÃO use predições.` },
       { icon: '🟨', label: 'Cartão!', prompt: `Saiu cartão no jogo ${homeName} x ${awayName}! Use DADOS AO VIVO: total de faltas, cartões já dados, tensão do jogo. NÃO use dados de predição.` },
-      { icon: '😡', label: 'Juiz errou!', prompt: `O juiz errou feio em ${homeName} x ${awayName}! Lance polêmico! Fique indignado! Use DADOS AO VIVO se disponíveis.` },
+      { icon: '🔄', label: 'Substituição', prompt: `Teve substituição no jogo ${homeName} x ${awayName}! Olhe a seção EVENTOS DO JOGO nos dados ao vivo e encontre a substituição mais recente. Fale de forma SIMPLES e CURTA: "No [time], entra [jogador que entrou], sai [jogador que saiu]. Jogo tá [placar] com [minutos] minutos." Varie o estilo: às vezes comente se a troca faz sentido, se o técnico tá mexendo certo, se o jogador que saiu tava bem ou mal. Use DADOS AO VIVO. MÁXIMO 200 caracteres.` },
       { icon: '👏', label: 'Que jogada!', prompt: `Que jogada linda em ${homeName} x ${awayName}! Elogie a qualidade técnica. Use DADOS AO VIVO.` },
       { icon: '😴', label: 'Jogo parado', prompt: `O jogo ${homeName} x ${awayName} tá sem emoção. Use DADOS AO VIVO: chutes no gol, finalizações, posse pra justificar o tédio.` },
     ],
