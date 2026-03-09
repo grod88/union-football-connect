@@ -252,7 +252,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 200,
+        max_tokens: 300,
         system: BOLINHA_SYSTEM_PROMPT,
         messages: [{ role: "user", content: userPrompt }],
       }),
@@ -260,7 +260,7 @@ serve(async (req) => {
 
     if (!claudeResponse.ok) {
       const errText = await claudeResponse.text();
-      console.error("Claude API error:", errText);
+      console.error("Claude API error:", claudeResponse.status, errText);
       return new Response(
         JSON.stringify({ error: "AI generation failed" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
