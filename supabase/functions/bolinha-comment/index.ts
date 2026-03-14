@@ -318,9 +318,8 @@ serve(async (req) => {
     }
 
     // Generate TTS audio (if requested)
-    // Truncate long text to avoid oversized audio that can't be broadcast
-    // 150 chars → ~180KB audio (fits in Supabase Realtime ~256KB limit)
-    const MAX_TTS_LENGTH = 150;
+    // Audio larger than broadcast limit will be uploaded to storage automatically
+    const MAX_TTS_LENGTH = 300;
     const ttsText = commentText.length > MAX_TTS_LENGTH
       ? commentText.substring(0, MAX_TTS_LENGTH) + '...'
       : commentText;
