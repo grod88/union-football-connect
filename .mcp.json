@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "union-ffmpeg": {
+      "type": "stdio",
+      "command": "/home/guru/Desktop/UnionFC/mcp_servers/union_ffmpeg/venv/bin/python",
+      "args": [
+        "/home/guru/Desktop/UnionFC/mcp_servers/union_ffmpeg/server.py"
+      ],
+      "env": {}
+    }
+  }
+}

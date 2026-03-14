@@ -1,0 +1,2 @@
+# Union FC FFmpeg MCP Server
+mcp[cli]>=1.0.0
