@@ -199,18 +199,21 @@ serve(async (req) => {
     let contextBlock = "";
 
     if (activeMatch) {
-      // Detect live data: check for any indicator that match is in progress
       const ls = activeMatch.live_summary || "";
-      const hasLiveData = ls.includes("PLACAR ATUAL") ||
+
+      // Check if match is ACTUALLY in progress (not just "Not Started")
+      const isNotStarted = ls.includes("Not Started") || ls.includes("NS");
+      const hasRealLiveData = !isNotStarted && (
         ls.includes("ESTATÍSTICAS AO VIVO") ||
         ls.includes("EVENTOS DO JOGO") ||
-        ls.includes("STATUS:");
+        (ls.includes("STATUS:") && !ls.includes("Not Started"))
+      );
 
-      if (hasLiveData) {
-        // Match is live — ONLY live data, NO pre-match predictions
+      if (hasRealLiveData) {
+        // Match is ACTUALLY live — use live data only
         contextBlock = `DADOS AO VIVO DA PARTIDA (USE APENAS ESTES):\n${activeMatch.live_summary}`;
       } else if (activeMatch.pre_match_summary) {
-        // Pre-match — use pre-match data
+        // Pre-match or not started — use pre-match data
         contextBlock = `DADOS PRÉ-JOGO DA PARTIDA (jogo ainda não começou):\n${activeMatch.pre_match_summary}`;
       } else if (activeMatch.context_summary) {
         // Fallback to old context_summary for backwards compat
