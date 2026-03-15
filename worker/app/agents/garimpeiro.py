@@ -15,6 +15,8 @@ from .base import (
     call_claude,
     parse_json_response,
 )
+from ..prompts import GARIMPEIRO_SYSTEM_PROMPT_V2
+from ..utils.agent_runtime import get_agent_runtime_preset
 
 
 GARIMPEIRO_SYSTEM_PROMPT = """Você é o GARIMPEIRO, especialista em encontrar MOMENTOS VIRAIS em transmissões de futebol.
@@ -100,13 +102,16 @@ class GarimpeiroAgent:
     e retorna clips de 15-30 segundos com alto potencial viral.
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, model: Optional[str] = None, prompt_version: str = "v1"):
+        runtime = get_agent_runtime_preset("garimpeiro", model_override=model)
         self.config = AgentConfig(
             name="garimpeiro",
-            model=model,
-            max_tokens=8192,
-            temperature=0.8,  # Mais criativo para encontrar viral
+            model=runtime.model,
+            max_tokens=runtime.max_tokens,
+            temperature=runtime.temperature,
+            top_p=runtime.top_p,
         )
+        self.system_prompt = GARIMPEIRO_SYSTEM_PROMPT_V2 if prompt_version == "v2" else GARIMPEIRO_SYSTEM_PROMPT
 
     def run(self, input_data: GarimpeiroInput) -> AgentResult:
         """
@@ -122,7 +127,7 @@ class GarimpeiroAgent:
 
         try:
             response_text, tokens_in, tokens_out = call_claude(
-                system_prompt=GARIMPEIRO_SYSTEM_PROMPT,
+                system_prompt=self.system_prompt,
                 user_prompt=user_prompt,
                 config=self.config,
             )
@@ -180,7 +185,8 @@ def run_garimpeiro(
     transcript_chunk: str,
     time_offset: float = 0,
     delegation_hints: Optional[List[dict]] = None,
-    model: str = "claude-sonnet-4-20250514",
+    model: Optional[str] = None,
+    prompt_version: str = "v1",
 ) -> AgentResult:
     """
     Função helper para rodar o Garimpeiro.
@@ -194,7 +200,7 @@ def run_garimpeiro(
     Returns:
         AgentResult com clips virais
     """
-    agent = GarimpeiroAgent(model=model)
+    agent = GarimpeiroAgent(model=model, prompt_version=prompt_version)
     input_data = GarimpeiroInput(
         transcript_chunk=transcript_chunk,
         time_offset=time_offset,

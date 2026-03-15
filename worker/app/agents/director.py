@@ -17,6 +17,8 @@ from .base import (
     call_claude,
     parse_json_response,
 )
+from ..prompts import DIRECTOR_SYSTEM_PROMPT_V2
+from ..utils.agent_runtime import get_agent_runtime_preset
 
 
 DIRECTOR_SYSTEM_PROMPT = """Você é o DIRETOR de uma equipe de produção de clips de futebol.
@@ -146,12 +148,17 @@ class DirectorAgent:
     de trabalho para os outros agentes.
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, model: Optional[str] = None, prompt_version: str = "v1"):
+        runtime = get_agent_runtime_preset("director", model_override=model)
         self.config = AgentConfig(
             name="director",
-            model=model,
-            max_tokens=16384,  # Mapa completo pode ser grande
-            temperature=0.6,  # Um pouco menos criativo, mais analítico
+            model=runtime.model,
+            max_tokens=runtime.max_tokens,
+            temperature=runtime.temperature,
+            top_p=runtime.top_p,
+        )
+        self.system_prompt = (
+            DIRECTOR_SYSTEM_PROMPT_V2 if prompt_version == "v2" else DIRECTOR_SYSTEM_PROMPT
         )
 
     def run(self, input_data: DirectorInput) -> AgentResult:
@@ -170,7 +177,7 @@ class DirectorAgent:
         try:
             # Chamar Claude
             response_text, tokens_in, tokens_out = call_claude(
-                system_prompt=DIRECTOR_SYSTEM_PROMPT,
+                system_prompt=self.system_prompt,
                 user_prompt=user_prompt,
                 config=self.config,
             )
@@ -242,7 +249,8 @@ def run_director(
     transcript: str,
     match_context: Optional[str] = None,
     video_duration: Optional[float] = None,
-    model: str = "claude-sonnet-4-20250514",
+  model: Optional[str] = None,
+    prompt_version: str = "v1",
 ) -> AgentResult:
     """
     Função helper para rodar o Diretor.
@@ -256,7 +264,7 @@ def run_director(
     Returns:
         AgentResult com mapa temático
     """
-    agent = DirectorAgent(model=model)
+    agent = DirectorAgent(model=model, prompt_version=prompt_version)
     input_data = DirectorInput(
         transcript=transcript,
         match_context=match_context,

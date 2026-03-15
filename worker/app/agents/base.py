@@ -14,6 +14,7 @@ class AgentConfig:
     model: str = "claude-sonnet-4-20250514"
     max_tokens: int = 8192
     temperature: float = 0.7
+    top_p: Optional[float] = None
 
 
 @dataclass
@@ -43,13 +44,18 @@ def call_claude(
     """
     client = Anthropic(api_key=settings.anthropic_api_key)
 
-    response = client.messages.create(
-        model=config.model,
-        max_tokens=config.max_tokens,
-        temperature=config.temperature,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
+    request_kwargs = {
+        "model": config.model,
+        "max_tokens": config.max_tokens,
+        "temperature": config.temperature,
+        "system": system_prompt,
+        "messages": [{"role": "user", "content": user_prompt}],
+    }
+
+    if config.top_p is not None:
+        request_kwargs["top_p"] = config.top_p
+
+    response = client.messages.create(**request_kwargs)
 
     text = response.content[0].text
     input_tokens = response.usage.input_tokens

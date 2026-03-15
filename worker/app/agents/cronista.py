@@ -15,6 +15,8 @@ from .base import (
     call_claude,
     parse_json_response,
 )
+from ..prompts import CRONISTA_SYSTEM_PROMPT_V2
+from ..utils.agent_runtime import get_agent_runtime_preset
 
 
 CRONISTA_SYSTEM_PROMPT = """Você é o CRONISTA, especialista em STORYTELLING para clips de futebol.
@@ -139,8 +141,9 @@ Responda APENAS com JSON válido:
 class CronistaInput:
     """Input for the Cronista agent."""
     transcript: str
-    suggested_arcs: Optional[List[dict]] = None  # From director
-    themes: Optional[List[dict]] = None  # Connected themes
+    suggested_arcs: Optional[List[dict]] = None
+    themes: Optional[List[dict]] = None
+    delegation_hints: Optional[List[dict]] = None
 
 
 class CronistaAgent:
@@ -151,13 +154,16 @@ class CronistaAgent:
     e monta narrativas com cold open e storytelling.
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, model: Optional[str] = None, prompt_version: str = "v1"):
+        runtime = get_agent_runtime_preset("cronista", model_override=model)
         self.config = AgentConfig(
             name="cronista",
-            model=model,
-            max_tokens=12288,
-            temperature=0.7,
+            model=runtime.model,
+            max_tokens=runtime.max_tokens,
+            temperature=runtime.temperature,
+            top_p=runtime.top_p,
         )
+        self.system_prompt = CRONISTA_SYSTEM_PROMPT_V2 if prompt_version == "v2" else CRONISTA_SYSTEM_PROMPT
 
     def run(self, input_data: CronistaInput) -> AgentResult:
         """
@@ -173,7 +179,7 @@ class CronistaAgent:
 
         try:
             response_text, tokens_in, tokens_out = call_claude(
-                system_prompt=CRONISTA_SYSTEM_PROMPT,
+                system_prompt=self.system_prompt,
                 user_prompt=user_prompt,
                 config=self.config,
             )
@@ -197,41 +203,56 @@ class CronistaAgent:
             )
 
     def _build_user_prompt(self, input_data: CronistaInput) -> str:
-        """Build user prompt with arcs and themes."""
+        """Build user prompt with arcs, themes, and director briefs."""
         parts = []
 
-        # Suggested arcs from director
+        if input_data.delegation_hints:
+            parts.append("## BRIEFS DO DIRETOR")
+            for hint in input_data.delegation_hints:
+                title = hint.get("brief") or hint.get("description") or hint.get("task_id") or "Tarefa"
+                parts.append(f"### {title}")
+                if hint.get("priority"):
+                    parts.append(f"Prioridade: {hint.get('priority')}")
+                if hint.get("angle"):
+                    parts.append(f"Ângulo: {hint.get('angle')}")
+                if hint.get("duration_target"):
+                    parts.append(f"Duração alvo: {hint.get('duration_target')}")
+                if hint.get("must_include"):
+                    parts.append(f"Must include: {hint.get('must_include')}")
+                if hint.get("must_avoid"):
+                    parts.append(f"Must avoid: {hint.get('must_avoid')}")
+                parts.append("")
+
         if input_data.suggested_arcs:
             parts.append("## ARCOS SUGERIDOS PELO DIRETOR")
             for arc in input_data.suggested_arcs:
                 parts.append(f"### {arc.get('title', 'Sem título')}")
                 parts.append(f"Tipo: {arc.get('type', 'unknown')}")
                 parts.append(f"Descrição: {arc.get('description', '')}")
-                if arc.get('moments'):
+                if arc.get("moments"):
                     parts.append("Momentos:")
-                    for m in arc['moments']:
-                        parts.append(f"  - {m.get('timestamp', '?')}s: {m.get('description', '')}")
+                    for moment in arc["moments"]:
+                        parts.append(f"  - {moment.get('timestamp', '?')}s: {moment.get('description', '')}")
                 parts.append("")
 
-        # Connected themes
         if input_data.themes:
             parts.append("## TEMAS CONECTADOS")
             for theme in input_data.themes:
-                if theme.get('connects_to'):
+                if theme.get("connects_to"):
                     parts.append(f"- {theme.get('label')} conecta com: {theme.get('connects_to')}")
             parts.append("")
 
-        # Transcript
         parts.append("## TRANSCRIÇÃO COMPLETA")
         parts.append(input_data.transcript)
 
-        # Task
-        parts.append("""
+        parts.append(
+            """
 ## TAREFA
 Construa ARCOS NARRATIVOS conectando momentos da transcrição.
 Use a técnica de COLD OPEN quando apropriado.
 Foque em histórias com setup → payoff claro.
-Retorne APENAS JSON no formato especificado.""")
+Retorne APENAS JSON no formato especificado."""
+        )
 
         return "\n".join(parts)
 
@@ -240,7 +261,9 @@ def run_cronista(
     transcript: str,
     suggested_arcs: Optional[List[dict]] = None,
     themes: Optional[List[dict]] = None,
-    model: str = "claude-sonnet-4-20250514",
+    delegation_hints: Optional[List[dict]] = None,
+    model: Optional[str] = None,
+    prompt_version: str = "v1",
 ) -> AgentResult:
     """
     Função helper para rodar o Cronista.
@@ -249,15 +272,17 @@ def run_cronista(
         transcript: Transcrição completa ou relevante
         suggested_arcs: Arcos sugeridos pelo Diretor
         themes: Temas conectados identificados
+        delegation_hints: Briefs detalhados do Diretor
         model: Modelo Claude a usar
 
     Returns:
         AgentResult com arcos narrativos
     """
-    agent = CronistaAgent(model=model)
+    agent = CronistaAgent(model=model, prompt_version=prompt_version)
     input_data = CronistaInput(
         transcript=transcript,
         suggested_arcs=suggested_arcs,
         themes=themes,
+        delegation_hints=delegation_hints,
     )
     return agent.run(input_data)

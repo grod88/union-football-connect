@@ -9,10 +9,10 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, HttpUrl
-from typing import Optional
+from typing import Optional, Any
 
 from .config import settings
-from .supabase_client import supabase, update_source_status, update_insight_status, log_worker
+from .supabase_client import supabase, update_source_status, update_insight_status, log_worker, log_crew_event
 from .processors.downloader import download_video, cleanup_job_files
 from .processors.transcriber import transcribe_audio
 from .processors.analyzer import analyze_transcript
@@ -30,6 +30,198 @@ def sanitize_error_message(error: str) -> str:
     # Mask Supabase keys
     sanitized = re.sub(r'eyJ[a-zA-Z0-9\-_]+\.eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+', '***JWT_REDACTED***', sanitized)
     return sanitized
+
+
+def _normalize_worker_tasks(delegation: dict[str, Any], worker_name: str) -> list[dict[str, Any]]:
+    """Normalize delegation formats from v1/v2 prompts into a list of task dicts."""
+    section = delegation.get(worker_name)
+
+    if isinstance(section, list):
+        return [item for item in section if isinstance(item, dict)]
+
+    if isinstance(section, dict):
+        tasks = section.get("tasks")
+        if isinstance(tasks, list):
+            return [item for item in tasks if isinstance(item, dict)]
+        if isinstance(tasks, dict):
+            return [tasks]
+        return [section]
+
+    return []
+
+
+def _coerce_range(range_value: Any) -> Optional[tuple[float, float]]:
+    """Convert a raw range value to a numeric (start, end) tuple."""
+    if not isinstance(range_value, (list, tuple)) or len(range_value) < 2:
+        return None
+
+    start, end = range_value[0], range_value[1]
+
+    if not isinstance(start, (int, float)) or not isinstance(end, (int, float)):
+        return None
+
+    start_value = float(start)
+    end_value = float(end)
+
+    if end_value < start_value:
+        start_value, end_value = end_value, start_value
+
+    return (start_value, end_value)
+
+
+def _extract_task_ranges(task: dict[str, Any]) -> list[tuple[float, float]]:
+    """Extract include ranges from a worker task."""
+    ranges: list[tuple[float, float]] = []
+
+    for key in ("transcript_ranges", "time_ranges"):
+        raw_ranges = task.get(key)
+        if isinstance(raw_ranges, list):
+            for raw_range in raw_ranges:
+                coerced = _coerce_range(raw_range)
+                if coerced:
+                    ranges.append(coerced)
+
+    single_range = task.get("time_range")
+    coerced_single = _coerce_range(single_range)
+    if coerced_single:
+        ranges.append(coerced_single)
+
+    return ranges
+
+
+def _extract_exclusion_ranges(tasks: list[dict[str, Any]]) -> list[tuple[float, float]]:
+    """Extract exclusion ranges from worker tasks."""
+    ranges: list[tuple[float, float]] = []
+
+    for task in tasks:
+        raw_ranges = task.get("exclusion_ranges")
+        if not isinstance(raw_ranges, list):
+            continue
+        for raw_range in raw_ranges:
+            coerced = _coerce_range(raw_range)
+            if coerced:
+                ranges.append(coerced)
+
+    return ranges
+
+
+def _merge_ranges(ranges: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Merge overlapping or adjacent ranges."""
+    if not ranges:
+        return []
+
+    sorted_ranges = sorted(ranges, key=lambda item: item[0])
+    merged: list[list[float]] = [[sorted_ranges[0][0], sorted_ranges[0][1]]]
+
+    for start, end in sorted_ranges[1:]:
+        current = merged[-1]
+        if start <= current[1] + 0.001:
+            current[1] = max(current[1], end)
+        else:
+            merged.append([start, end])
+
+    return [(start, end) for start, end in merged]
+
+
+def _range_overlaps(seg_start: float, seg_end: float, ranges: list[tuple[float, float]]) -> bool:
+    """Check whether a transcript segment overlaps any range."""
+    return any(seg_end >= start and seg_start <= end for start, end in ranges)
+
+
+def _is_effectively_full_range(ranges: list[tuple[float, float]]) -> bool:
+    """Detect sentinel ranges that effectively mean full transcript."""
+    return any(start <= 0 and end >= 999999 for start, end in ranges)
+
+
+def _build_transcript_window(
+    transcript_json: list[dict[str, Any]],
+    include_ranges: Optional[list[tuple[float, float]]] = None,
+    exclude_ranges: Optional[list[tuple[float, float]]] = None,
+) -> str:
+    """Build a timestamped transcript string from transcript_json using include/exclude windows."""
+    if not transcript_json:
+        return ""
+
+    include = _merge_ranges(include_ranges or [])
+    exclude = _merge_ranges(exclude_ranges or [])
+
+    lines: list[str] = []
+    for segment in transcript_json:
+        seg_start = float(segment.get("start", 0) or 0)
+        seg_end = float(segment.get("end", seg_start) or seg_start)
+        seg_text = str(segment.get("text", "") or "").strip()
+
+        if not seg_text:
+            continue
+
+        if include and not _range_overlaps(seg_start, seg_end, include):
+            continue
+
+        if exclude and _range_overlaps(seg_start, seg_end, exclude):
+            continue
+
+        lines.append(f"[{seg_start:.2f}-{seg_end:.2f}] {seg_text}")
+
+    return "\n".join(lines)
+
+
+def _build_worker_transcript(
+    transcript_text: str,
+    transcript_json: list[dict[str, Any]],
+    tasks: list[dict[str, Any]],
+) -> str:
+    """Build the transcript payload for a worker, using director ranges when available."""
+    include_ranges: list[tuple[float, float]] = []
+    for task in tasks:
+        include_ranges.extend(_extract_task_ranges(task))
+
+    exclude_ranges = _extract_exclusion_ranges(tasks)
+
+    if transcript_json:
+        if include_ranges and not _is_effectively_full_range(include_ranges):
+            sliced = _build_transcript_window(
+                transcript_json,
+                include_ranges=include_ranges,
+                exclude_ranges=exclude_ranges,
+            )
+            if sliced.strip():
+                return sliced
+
+        if exclude_ranges:
+            sliced = _build_transcript_window(
+                transcript_json,
+                include_ranges=None,
+                exclude_ranges=exclude_ranges,
+            )
+            if sliced.strip():
+                return sliced
+
+    return transcript_text
+
+
+def _filter_suggested_arcs_for_tasks(
+    suggested_arcs: list[dict[str, Any]],
+    tasks: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Filter suggested arcs using blueprint/task references when available."""
+    if not tasks:
+        return suggested_arcs
+
+    blueprint_refs = {
+        str(task.get("blueprint_ref"))
+        for task in tasks
+        if task.get("blueprint_ref")
+    }
+
+    if not blueprint_refs:
+        return suggested_arcs
+
+    filtered = [
+        arc for arc in suggested_arcs
+        if str(arc.get("arc_id") or arc.get("id") or arc.get("title")) in blueprint_refs
+    ]
+
+    return filtered or suggested_arcs
 
 
 @asynccontextmanager
@@ -1194,7 +1386,8 @@ from .agents import run_director, run_garimpeiro, run_cronista, run_analista, ru
 
 class AnalyzeCrewRequest(BaseModel):
     """Request to analyze a video with the full crew of agents."""
-    model: str = "claude-sonnet-4-20250514"  # Model for agents
+    model: Optional[str] = None
+    prompt_version: str = "v1"
 
 
 class AnalyzeCrewResponse(BaseModel):
@@ -1257,15 +1450,34 @@ async def analyze_with_crew(
 
         # Run Director agent
         print(f"🎬 [Crew] Starting Director agent for session {session_id}")
+        log_crew_event(
+            source_id,
+            session_id,
+            "director",
+            "Iniciando Diretor",
+            details={
+                "prompt_version": request.prompt_version,
+                "model_override": request.model,
+                "video_duration_seconds": source.get("duration_seconds"),
+            },
+        )
 
         director_result = run_director(
             transcript=transcript,
             match_context=match_context,
             video_duration=source.get("duration_seconds"),
             model=request.model,
+            prompt_version=request.prompt_version,
         )
 
         if not director_result.success:
+            log_crew_event(
+                source_id,
+                session_id,
+                "director",
+                f"Diretor falhou: {sanitize_error_message(director_result.error or 'erro desconhecido')}",
+                level="error",
+            )
             # Update session with error
             supabase.table("clip_sessions").update({
                 "status": "error",
@@ -1298,6 +1510,19 @@ async def analyze_with_crew(
             "total_cost_tokens": director_result.total_tokens,
         }).eq("id", session_id).execute()
 
+        log_crew_event(
+            source_id,
+            session_id,
+            "director",
+            "Diretor concluído",
+            details={
+                "themes": len(director_result.data.get("themes", [])),
+                "emotional_peaks": len(director_result.data.get("emotional_peaks", [])),
+                "suggested_arcs": len(director_result.data.get("suggested_arcs", [])),
+                "tokens_used": director_result.total_tokens,
+            },
+        )
+
         print(f"✅ [Crew] Director completed. Tokens: {director_result.total_tokens}")
         print(f"   Themes: {len(director_result.data.get('themes', []))}")
         print(f"   Peaks: {len(director_result.data.get('emotional_peaks', []))}")
@@ -1317,6 +1542,14 @@ async def analyze_with_crew(
         print(f"❌ [Crew] Error: {e}")
         import traceback
         traceback.print_exc()
+        if 'session_id' in locals() and 'source_id' in locals():
+            log_crew_event(
+                source_id,
+                session_id,
+                "director",
+                f"Erro inesperado no Diretor: {sanitize_error_message(str(e))}",
+                level="error",
+            )
         raise HTTPException(status_code=500, detail=sanitize_error_message(str(e)))
 
 
@@ -1362,7 +1595,8 @@ class RunWorkersRequest(BaseModel):
     """Request to run worker agents on a session."""
     session_id: str
     workers: list[str] = ["garimpeiro", "cronista", "analista"]  # Which workers to run
-    model: str = "claude-sonnet-4-20250514"
+    model: Optional[str] = None
+    prompt_version: str = "v1"
 
 
 @app.post("/api/crew-sessions/{session_id}/run-workers")
@@ -1408,7 +1642,7 @@ async def run_crew_workers(
 
         # Get video source with transcript
         source_result = supabase.table("video_sources").select(
-            "transcript_text, context, title"
+            "transcript_text, transcript_json, context, title"
         ).eq("id", session.get("video_source_id")).single().execute()
 
         if not source_result.data:
@@ -1416,6 +1650,7 @@ async def run_crew_workers(
 
         source = source_result.data
         transcript = source.get("transcript_text")
+        transcript_json = source.get("transcript_json") or []
 
         if not transcript:
             raise HTTPException(status_code=400, detail="No transcript available")
@@ -1427,22 +1662,63 @@ async def run_crew_workers(
             "progress": 0.3,
         }).eq("id", session_id).execute()
 
+        log_crew_event(
+            session.get("video_source_id"),
+            session_id,
+            "workers",
+            "Iniciando workers",
+            details={
+                "workers": request.workers,
+                "prompt_version": request.prompt_version,
+                "model_override": request.model,
+            },
+        )
+
         # Run workers
         results = {}
         total_tokens = 0
         delegation = live_map.get("delegation", {})
+        garimpeiro_tasks = _normalize_worker_tasks(delegation, "garimpeiro")
+        cronista_tasks = _normalize_worker_tasks(delegation, "cronista")
+        analista_tasks = _normalize_worker_tasks(delegation, "analista")
+
+        garimpeiro_transcript = _build_worker_transcript(transcript, transcript_json, garimpeiro_tasks)
+        cronista_transcript = _build_worker_transcript(transcript, transcript_json, cronista_tasks)
+        analista_transcript = _build_worker_transcript(transcript, transcript_json, analista_tasks)
+
+        log_crew_event(
+            session.get("video_source_id"),
+            session_id,
+            "workers",
+            "Contextos dos workers preparados",
+            details={
+                "garimpeiro_tasks": len(garimpeiro_tasks),
+                "cronista_tasks": len(cronista_tasks),
+                "analista_tasks": len(analista_tasks),
+                "garimpeiro_chars": len(garimpeiro_transcript),
+                "cronista_chars": len(cronista_transcript),
+                "analista_chars": len(analista_transcript),
+            },
+        )
 
         print(f"🎬 [Crew] Running workers for session {session_id}")
 
         # Run Garimpeiro
         if "garimpeiro" in request.workers:
             print(f"   ⛏️ Running Garimpeiro...")
-            garimpeiro_hints = delegation.get("garimpeiro", [])
+            log_crew_event(
+                session.get("video_source_id"),
+                session_id,
+                "garimpeiro",
+                "Executando Garimpeiro",
+                details={"delegation_tasks": len(garimpeiro_tasks)},
+            )
 
             garimpeiro_result = run_garimpeiro(
-                transcript_chunk=transcript,
-                delegation_hints=garimpeiro_hints,
+                transcript_chunk=garimpeiro_transcript,
+                delegation_hints=garimpeiro_tasks,
                 model=request.model,
+                prompt_version=request.prompt_version,
             )
 
             if garimpeiro_result.success:
@@ -1461,28 +1737,68 @@ async def run_crew_workers(
                     "tokens": garimpeiro_result.total_tokens,
                 }
                 total_tokens += garimpeiro_result.total_tokens
+                log_crew_event(
+                    session.get("video_source_id"),
+                    session_id,
+                    "garimpeiro",
+                    "Garimpeiro concluído",
+                    details={
+                        "clips_found": len(garimpeiro_result.data.get("clips", [])),
+                        "tokens_used": garimpeiro_result.total_tokens,
+                    },
+                )
                 print(f"   ⛏️ Garimpeiro found {len(garimpeiro_result.data.get('clips', []))} clips")
             else:
                 results["garimpeiro"] = {"success": False, "error": garimpeiro_result.error}
+                log_crew_event(
+                    session.get("video_source_id"),
+                    session_id,
+                    "garimpeiro",
+                    f"Garimpeiro falhou: {sanitize_error_message(garimpeiro_result.error or 'erro desconhecido')}",
+                    level="error",
+                )
                 print(f"   ❌ Garimpeiro failed: {garimpeiro_result.error}")
 
         # Wait before running next worker to avoid rate limit (30k tokens/min)
         if "cronista" in request.workers or "analista" in request.workers:
             wait_time = 65  # seconds - wait for rate limit to reset
             print(f"   ⏳ Waiting {wait_time}s for rate limit reset...")
+            log_crew_event(
+                session.get("video_source_id"),
+                session_id,
+                "workers",
+                f"Aguardando {wait_time}s por rate limit",
+            )
             await asyncio.sleep(wait_time)
 
         # Run Cronista
         if "cronista" in request.workers:
             print(f"   📜 Running Cronista...")
-            suggested_arcs = live_map.get("suggested_arcs", [])
+            suggested_arcs = _filter_suggested_arcs_for_tasks(
+                live_map.get("suggested_arcs", []),
+                cronista_tasks,
+            )
             themes = live_map.get("themes", [])
 
+            log_crew_event(
+                session.get("video_source_id"),
+                session_id,
+                "cronista",
+                "Executando Cronista",
+                details={
+                    "delegation_tasks": len(cronista_tasks),
+                    "suggested_arcs": len(suggested_arcs),
+                    "themes": len(themes),
+                },
+            )
+
             cronista_result = run_cronista(
-                transcript=transcript,
+                transcript=cronista_transcript,
                 suggested_arcs=suggested_arcs,
                 themes=themes,
+                delegation_hints=cronista_tasks,
                 model=request.model,
+                prompt_version=request.prompt_version,
             )
 
             if cronista_result.success:
@@ -1500,27 +1816,57 @@ async def run_crew_workers(
                     "tokens": cronista_result.total_tokens,
                 }
                 total_tokens += cronista_result.total_tokens
+                log_crew_event(
+                    session.get("video_source_id"),
+                    session_id,
+                    "cronista",
+                    "Cronista concluído",
+                    details={
+                        "clips_found": len(cronista_result.data.get("clips", [])),
+                        "tokens_used": cronista_result.total_tokens,
+                    },
+                )
                 print(f"   📜 Cronista found {len(cronista_result.data.get('clips', []))} arcs")
             else:
                 results["cronista"] = {"success": False, "error": cronista_result.error}
+                log_crew_event(
+                    session.get("video_source_id"),
+                    session_id,
+                    "cronista",
+                    f"Cronista falhou: {sanitize_error_message(cronista_result.error or 'erro desconhecido')}",
+                    level="error",
+                )
                 print(f"   ❌ Cronista failed: {cronista_result.error}")
 
             # Wait before running Analista to avoid rate limit
             if "analista" in request.workers:
                 wait_time = 65  # seconds
                 print(f"   ⏳ Waiting {wait_time}s for rate limit reset...")
+                log_crew_event(
+                    session.get("video_source_id"),
+                    session_id,
+                    "workers",
+                    f"Aguardando {wait_time}s por rate limit",
+                )
                 await asyncio.sleep(wait_time)
 
         # Run Analista
         if "analista" in request.workers:
             print(f"   🔍 Running Analista...")
-            analista_hints = delegation.get("analista", [])
+            log_crew_event(
+                session.get("video_source_id"),
+                session_id,
+                "analista",
+                "Executando Analista",
+                details={"delegation_tasks": len(analista_tasks)},
+            )
 
             analista_result = run_analista(
-                transcript_chunk=transcript,
-                delegation_hints=analista_hints,
+                transcript_chunk=analista_transcript,
+                delegation_hints=analista_tasks,
                 match_context=source.get("context") or source.get("title"),
                 model=request.model,
+                prompt_version=request.prompt_version,
             )
 
             if analista_result.success:
@@ -1538,9 +1884,26 @@ async def run_crew_workers(
                     "tokens": analista_result.total_tokens,
                 }
                 total_tokens += analista_result.total_tokens
+                log_crew_event(
+                    session.get("video_source_id"),
+                    session_id,
+                    "analista",
+                    "Analista concluído",
+                    details={
+                        "clips_found": len(analista_result.data.get("clips", [])),
+                        "tokens_used": analista_result.total_tokens,
+                    },
+                )
                 print(f"   🔍 Analista found {len(analista_result.data.get('clips', []))} insights")
             else:
                 results["analista"] = {"success": False, "error": analista_result.error}
+                log_crew_event(
+                    session.get("video_source_id"),
+                    session_id,
+                    "analista",
+                    f"Analista falhou: {sanitize_error_message(analista_result.error or 'erro desconhecido')}",
+                    level="error",
+                )
                 print(f"   ❌ Analista failed: {analista_result.error}")
 
         # Update session
@@ -1550,6 +1913,17 @@ async def run_crew_workers(
             "progress": 0.6,
             "total_cost_tokens": session.get("total_cost_tokens", 0) + total_tokens,
         }).eq("id", session_id).execute()
+
+        log_crew_event(
+            session.get("video_source_id"),
+            session_id,
+            "workers",
+            "Workers concluídos",
+            details={
+                "total_tokens": total_tokens,
+                "completed_workers": [name for name, result in results.items() if result.get("success")],
+            },
+        )
 
         print(f"✅ [Crew] Workers completed. Total tokens: {total_tokens}")
 
@@ -1567,6 +1941,15 @@ async def run_crew_workers(
         import traceback
         traceback.print_exc()
 
+        if 'session' in locals() and session.get("video_source_id"):
+            log_crew_event(
+                session.get("video_source_id"),
+                session_id,
+                "workers",
+                f"Erro inesperado nos workers: {sanitize_error_message(str(e))}",
+                level="error",
+            )
+
         supabase.table("clip_sessions").update({
             "status": "error",
             "error_message": str(e),
@@ -1579,7 +1962,8 @@ class RunProdutorRequest(BaseModel):
     """Request to run Produtor + Crítico on worker outputs."""
     max_clips: int = 10
     max_iterations: int = 2  # Max feedback iterations
-    model: str = "claude-sonnet-4-20250514"
+    model: Optional[str] = None
+    prompt_version: str = "v1"
 
 
 @app.post("/api/crew-sessions/{session_id}/run-produtor")
@@ -1648,6 +2032,21 @@ async def run_produtor_endpoint(
             "progress": 0.7,
         }).eq("id", session_id).execute()
 
+        log_crew_event(
+            session.get("video_source_id"),
+            session_id,
+            "produtor",
+            "Iniciando Produtor",
+            details={
+                "garimpeiro_clips": len(garimpeiro_clips),
+                "cronista_clips": len(cronista_clips),
+                "analista_clips": len(analista_clips),
+                "prompt_version": request.prompt_version,
+                "model_override": request.model,
+                "max_clips": request.max_clips,
+            },
+        )
+
         print(f"🎬 [Crew] Running Produtor for session {session_id}")
         print(f"   Input: {len(garimpeiro_clips)} garimpeiro, {len(cronista_clips)} cronista, {len(analista_clips)} analista")
 
@@ -1659,6 +2058,7 @@ async def run_produtor_endpoint(
             live_summary=live_summary,
             max_clips=request.max_clips,
             model=request.model,
+            prompt_version=request.prompt_version,
         )
 
         if not produtor_result.success:
@@ -1674,6 +2074,18 @@ async def run_produtor_endpoint(
 
         production_plan = produtor_result.data.get("production_plan", {})
         final_clips = produtor_result.data.get("clips", [])
+
+        log_crew_event(
+            session.get("video_source_id"),
+            session_id,
+            "produtor",
+            "Produtor concluiu o plano",
+            details={
+                "clips_count": len(final_clips),
+                "dropped_clips": len(produtor_result.data.get("dropped_clips", [])),
+                "tokens_used": produtor_result.total_tokens,
+            },
+        )
 
         print(f"   ✅ Produtor created plan with {len(final_clips)} clips")
 
@@ -1697,6 +2109,14 @@ async def run_produtor_endpoint(
             "progress": 0.85,
         }).eq("id", session_id).execute()
 
+        log_crew_event(
+            session.get("video_source_id"),
+            session_id,
+            "critico",
+            "Iniciando Crítico",
+            details={"clips_count": len(final_clips)},
+        )
+
         print(f"🎬 [Crew] Running Crítico for session {session_id}")
 
         # Run Crítico
@@ -1705,6 +2125,7 @@ async def run_produtor_endpoint(
             clips=final_clips,
             iteration=1,
             model=request.model,
+            prompt_version=request.prompt_version,
         )
 
         if not critico_result.success:
@@ -1721,6 +2142,21 @@ async def run_produtor_endpoint(
         evaluations = critico_result.data.get("evaluations", [])
         summary = critico_result.data.get("summary", {})
         total_tokens += critico_result.total_tokens
+
+        log_crew_event(
+            session.get("video_source_id"),
+            session_id,
+            "critico",
+            "Crítico concluiu a avaliação",
+            details={
+                "evaluated_clips": len(evaluations),
+                "approved": summary.get("approved", 0),
+                "needs_work": summary.get("needs_work", 0),
+                "rejected": summary.get("rejected", 0),
+                "average_score": summary.get("average_score"),
+                "tokens_used": critico_result.total_tokens,
+            },
+        )
 
         print(f"   ✅ Crítico evaluated {len(evaluations)} clips")
         print(f"   Approved: {summary.get('approved', 0)}, Needs work: {summary.get('needs_work', 0)}, Rejected: {summary.get('rejected', 0)}")
@@ -1745,6 +2181,18 @@ async def run_produtor_endpoint(
             "total_cost_tokens": session.get("total_cost_tokens", 0) + total_tokens,
         }).eq("id", session_id).execute()
 
+        log_crew_event(
+            session.get("video_source_id"),
+            session_id,
+            "session",
+            "Sessão concluída",
+            details={
+                "status": "completed",
+                "total_tokens": total_tokens,
+                "plan_id": plan_id,
+            },
+        )
+
         print(f"✅ [Crew] Production complete. Total tokens: {total_tokens}")
 
         return {
@@ -1764,6 +2212,15 @@ async def run_produtor_endpoint(
         print(f"❌ [Crew] Produtor error: {e}")
         import traceback
         traceback.print_exc()
+
+        if 'session' in locals() and session.get("video_source_id"):
+            log_crew_event(
+                session.get("video_source_id"),
+                session_id,
+                "produtor",
+                f"Erro inesperado no Produtor/Crítico: {sanitize_error_message(str(e))}",
+                level="error",
+            )
 
         supabase.table("clip_sessions").update({
             "status": "error",

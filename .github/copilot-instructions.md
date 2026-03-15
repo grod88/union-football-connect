@@ -131,3 +131,56 @@ const { data, isLoading } = useQuery({
 2. Test with `npm run dev`
 3. Commit to GitHub (auto-syncs with Lovable)
 4. Deploy via Lovable's "Share → Publish"
+
+## MCP Video Workflow
+
+The repository includes a local MCP server for FFmpeg-backed video production:
+
+- **Server config**: `.mcp.json`
+- **Server name**: `union-ffmpeg`
+- **Entrypoint**: `mcp_servers/union_ffmpeg/server.py`
+- **Python env**: `mcp_servers/union_ffmpeg/venv/`
+
+When working on clip rendering, timelines, subtitles, overlays, intros/outros, or audio treatment for the local `worker/` pipeline:
+
+1. **Prefer the MCP server** over hand-written shell `ffmpeg` commands when MCP tools are available in the editor session.
+2. **Do not invent tool names** — use only the tools actually exposed by `union-ffmpeg`.
+3. **Keep timestamps numeric in seconds** across plans, prompts, and production specs.
+4. **Do not overwrite source media**; write derived media to temp/output paths.
+5. **Verify assets exist** under `worker/assets/` before referencing intro/outro, fonts, logos, or music.
+
+Useful `union-ffmpeg` tools include:
+
+- `get_media_info`
+- `trim_video`
+- `remove_silence`
+- `concatenate_videos`
+- `change_resolution`
+- `add_image_overlay`
+- `add_union_logo`
+- `burn_subtitles`
+- `generate_srt_file`
+- `audio_duck`
+- `mix_background_music`
+- `boost_volume`
+- `select_music_by_mood`
+- `add_fade_effect`
+- `create_text_card`
+- `add_union_intro_outro`
+- `apply_template_reaction`
+- `apply_template_split_horizontal`
+- `apply_template_grande_momento`
+- `apply_template_resenha`
+- `generate_production_report`
+
+Recommended order when assembling a clip:
+
+1. Inspect source with `get_media_info`
+2. Cut segments with `trim_video`
+3. Concatenate if needed with `concatenate_videos`
+4. Add subtitles/overlays/logo
+5. Apply audio treatment and optional music
+6. Apply intro/outro or a Union template
+7. Generate a production report for debugging/handoff
+
+If MCP is not available in the current session, use `worker/app/processors/producer_mcp.py` as the source of truth for the expected video-production flow and keep the code compatible with the registered `union-ffmpeg` server.

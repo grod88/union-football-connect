@@ -15,6 +15,8 @@ from .base import (
     call_claude,
     parse_json_response,
 )
+from ..prompts import ANALISTA_SYSTEM_PROMPT_V2
+from ..utils.agent_runtime import get_agent_runtime_preset
 
 
 ANALISTA_SYSTEM_PROMPT = """Você é o ANALISTA, especialista em INSIGHTS TÁTICOS de futebol.
@@ -134,13 +136,16 @@ class AnalistaAgent:
     e cria clips educacionais sobre futebol.
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, model: Optional[str] = None, prompt_version: str = "v1"):
+        runtime = get_agent_runtime_preset("analista", model_override=model)
         self.config = AgentConfig(
             name="analista",
-            model=model,
-            max_tokens=8192,
-            temperature=0.5,  # Mais preciso para análises
+            model=runtime.model,
+            max_tokens=runtime.max_tokens,
+            temperature=runtime.temperature,
+            top_p=runtime.top_p,
         )
+        self.system_prompt = ANALISTA_SYSTEM_PROMPT_V2 if prompt_version == "v2" else ANALISTA_SYSTEM_PROMPT
 
     def run(self, input_data: AnalistaInput) -> AgentResult:
         """
@@ -156,7 +161,7 @@ class AnalistaAgent:
 
         try:
             response_text, tokens_in, tokens_out = call_claude(
-                system_prompt=ANALISTA_SYSTEM_PROMPT,
+                system_prompt=self.system_prompt,
                 user_prompt=user_prompt,
                 config=self.config,
             )
@@ -225,7 +230,8 @@ def run_analista(
     time_offset: float = 0,
     delegation_hints: Optional[List[dict]] = None,
     match_context: Optional[str] = None,
-    model: str = "claude-sonnet-4-20250514",
+    model: Optional[str] = None,
+    prompt_version: str = "v1",
 ) -> AgentResult:
     """
     Função helper para rodar o Analista.
@@ -240,7 +246,7 @@ def run_analista(
     Returns:
         AgentResult com insights táticos
     """
-    agent = AnalistaAgent(model=model)
+    agent = AnalistaAgent(model=model, prompt_version=prompt_version)
     input_data = AnalistaInput(
         transcript_chunk=transcript_chunk,
         time_offset=time_offset,

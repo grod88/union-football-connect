@@ -69,3 +69,26 @@ def log_worker(
     except Exception as e:
         # Don't let logging errors break the pipeline
         print(f"⚠️ Failed to log: {e}")
+
+
+def log_crew_event(
+    source_id: str,
+    session_id: str,
+    agent: str,
+    message: str,
+    level: str = "info",
+    details: dict | None = None,
+):
+    """Log crew activity using the shared worker_logs table with session metadata."""
+    payload = {
+        "session_id": session_id,
+        "agent": agent,
+        **(details or {}),
+    }
+    log_worker(
+        source_id=source_id,
+        step=f"crew:{agent}",
+        message=message,
+        level=level,
+        details=payload,
+    )

@@ -45,8 +45,16 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const API_BASE = 'http://localhost:8000';
+type PromptVersion = 'v1' | 'v2';
 
 // Types for crew session
 interface Theme {
@@ -77,10 +85,32 @@ interface SuggestedArc {
   cold_open_suggestion?: string;
 }
 
+interface DelegationTask {
+  task_id?: string;
+  brief?: string;
+  description?: string;
+  priority?: string;
+  angle?: string;
+  duration_target?: string;
+  arc_type?: string;
+  focus?: string;
+  type?: string;
+  blueprint_ref?: string;
+  time_ranges?: [number, number][];
+  transcript_ranges?: [number, number][];
+  time_range?: [number, number];
+  must_include?: string[];
+  must_avoid?: string[];
+}
+
+interface DelegationBucket {
+  tasks?: DelegationTask[];
+}
+
 interface Delegation {
-  cronista?: { arc_type: string; description: string; time_ranges: [number, number][]; priority: string }[];
-  analista?: { focus: string; description: string; time_ranges: [number, number][]; priority: string }[];
-  garimpeiro?: { type: string; description: string; time_range: [number, number]; priority: string }[];
+  cronista?: DelegationTask[] | DelegationBucket;
+  analista?: DelegationTask[] | DelegationBucket;
+  garimpeiro?: DelegationTask[] | DelegationBucket;
 }
 
 interface LiveMap {
@@ -217,6 +247,26 @@ const ARC_TYPE_COLORS: Record<string, string> = {
   humor: 'bg-blue-500',
 };
 
+function normalizeDelegationTasks(section?: DelegationTask[] | DelegationBucket): DelegationTask[] {
+  if (!section) return [];
+  if (Array.isArray(section)) return section;
+  if (Array.isArray(section.tasks)) return section.tasks;
+  return [];
+}
+
+function getDelegationLabel(task: DelegationTask): string {
+  return (
+    task.brief ||
+    task.description ||
+    task.angle ||
+    task.focus ||
+    task.arc_type ||
+    task.type ||
+    task.task_id ||
+    'Tarefa sem descrição'
+  );
+}
+
 export default function ClipsStudio() {
   const [videoSources, setVideoSources] = useState<VideoSource[]>([]);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
@@ -236,6 +286,7 @@ export default function ClipsStudio() {
   const [showProductionModal, setShowProductionModal] = useState(false);
   const [selectedClipIds, setSelectedClipIds] = useState<Set<string>>(new Set());
   const [producingClipId, setProducingClipId] = useState<string | null>(null);
+  const [promptVersion, setPromptVersion] = useState<PromptVersion>('v2');
 
   // Load video sources that are analyzed
   const loadVideoSources = useCallback(async () => {
@@ -265,13 +316,19 @@ export default function ClipsStudio() {
       const data = await response.json();
       setCrewSessions(data.sessions || []);
 
-      // Auto-select the latest completed session
-      const completed = data.sessions?.find((s: CrewSession) => s.status === 'completed');
-      if (completed) {
-        setSelectedSession(completed);
-      } else {
-        setSelectedSession(null);
-      }
+      setSelectedSession((current) => {
+        const sessions = data.sessions || [];
+        if (!sessions.length) return null;
+
+        const currentMatch = current ? sessions.find((session: CrewSession) => session.id === current.id) : null;
+        if (currentMatch) return currentMatch;
+
+        const preferred = sessions.find((session: CrewSession) => session.status === 'workers_done')
+          || sessions.find((session: CrewSession) => session.status === 'completed')
+          || sessions[0];
+
+        return preferred || null;
+      });
     } catch (error) {
       console.error('Error loading crew sessions:', error);
       toast.error('Erro ao carregar sessões');
@@ -289,7 +346,9 @@ export default function ClipsStudio() {
       const response = await fetch(`${API_BASE}/api/clips/${selectedSourceId}/analyze-crew`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-20250514' }),
+        body: JSON.stringify({
+          prompt_version: promptVersion,
+        }),
       });
 
       if (!response.ok) {
@@ -322,7 +381,7 @@ export default function ClipsStudio() {
         body: JSON.stringify({
           session_id: selectedSession.id,
           workers: ['garimpeiro', 'cronista', 'analista'],
-          model: 'claude-sonnet-4-20250514',
+          prompt_version: promptVersion,
         }),
       });
 
@@ -357,7 +416,7 @@ export default function ClipsStudio() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           max_clips: 10,
-          model: 'claude-sonnet-4-20250514',
+          prompt_version: promptVersion,
         }),
       });
 
@@ -698,6 +757,9 @@ export default function ClipsStudio() {
 
   const selectedSource = videoSources.find((s) => s.id === selectedSourceId);
   const liveMap = selectedSession?.clip_live_maps?.[0];
+  const cronistaDelegation = normalizeDelegationTasks(liveMap?.delegation?.cronista);
+  const analistaDelegation = normalizeDelegationTasks(liveMap?.delegation?.analista);
+  const garimpeiroDelegation = normalizeDelegationTasks(liveMap?.delegation?.garimpeiro);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 md:p-8">
@@ -789,7 +851,31 @@ export default function ClipsStudio() {
                           {crewSessions.length} análises realizadas
                         </p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-3 flex-wrap justify-end">
+                        <div className="min-w-[220px] rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-2">
+                          <p className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">
+                            Prompt Crew
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={promptVersion}
+                              onValueChange={(value) => setPromptVersion(value as PromptVersion)}
+                            >
+                              <SelectTrigger className="h-8 border-gray-600 bg-gray-900 text-white">
+                                <SelectValue placeholder="Selecione a versão" />
+                              </SelectTrigger>
+                              <SelectContent className="border-gray-700 bg-gray-900 text-white">
+                                <SelectItem value="v1">v1 — legado estável</SelectItem>
+                                <SelectItem value="v2">v2 — prompts do plano</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Badge className={promptVersion === 'v2' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-white'}>
+                              {promptVersion.toUpperCase()}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 flex-wrap justify-end">
                         <Button
                           onClick={runCrewAnalysis}
                           disabled={isAnalyzing}
@@ -834,6 +920,7 @@ export default function ClipsStudio() {
                           <Video className="w-4 h-4 mr-2" />
                           PRODUZIR
                         </Button>
+                        </div>
 
                         {/* Agent Insights Modal */}
                         {selectedSession && (liveMap || workerOutputs.length > 0 || productionPlan) && (
@@ -1705,18 +1792,21 @@ export default function ClipsStudio() {
                           {/* Cronista */}
                           <div className="p-3 bg-purple-900/20 rounded-lg border border-purple-500/30">
                             <h4 className="text-sm font-bold text-purple-400 mb-2">
-                              CRONISTA ({liveMap.delegation?.cronista?.length || 0})
+                              CRONISTA ({cronistaDelegation.length || 0})
                             </h4>
                             <div className="space-y-2">
-                              {liveMap.delegation?.cronista?.map((task, idx) => (
+                              {cronistaDelegation.map((task, idx) => (
                                 <div key={idx} className="text-xs text-gray-400">
                                   <Badge
                                     variant="outline"
                                     className="text-[10px] border-purple-500/50 text-purple-400 mb-1"
                                   >
-                                    {task.priority}
+                                    {task.priority || 'sem prioridade'}
                                   </Badge>
-                                  <p className="text-white">{task.description}</p>
+                                  <p className="text-white">{getDelegationLabel(task)}</p>
+                                  {task.duration_target && (
+                                    <p className="text-[10px] text-gray-500 mt-1">Duração alvo: {task.duration_target}</p>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -1725,18 +1815,21 @@ export default function ClipsStudio() {
                           {/* Analista */}
                           <div className="p-3 bg-blue-900/20 rounded-lg border border-blue-500/30">
                             <h4 className="text-sm font-bold text-blue-400 mb-2">
-                              ANALISTA ({liveMap.delegation?.analista?.length || 0})
+                              ANALISTA ({analistaDelegation.length || 0})
                             </h4>
                             <div className="space-y-2">
-                              {liveMap.delegation?.analista?.map((task, idx) => (
+                              {analistaDelegation.map((task, idx) => (
                                 <div key={idx} className="text-xs text-gray-400">
                                   <Badge
                                     variant="outline"
                                     className="text-[10px] border-blue-500/50 text-blue-400 mb-1"
                                   >
-                                    {task.priority}
+                                    {task.priority || 'sem prioridade'}
                                   </Badge>
-                                  <p className="text-white">{task.description}</p>
+                                  <p className="text-white">{getDelegationLabel(task)}</p>
+                                  {task.duration_target && (
+                                    <p className="text-[10px] text-gray-500 mt-1">Duração alvo: {task.duration_target}</p>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -1745,18 +1838,21 @@ export default function ClipsStudio() {
                           {/* Garimpeiro */}
                           <div className="p-3 bg-green-900/20 rounded-lg border border-green-500/30">
                             <h4 className="text-sm font-bold text-green-400 mb-2">
-                              GARIMPEIRO ({liveMap.delegation?.garimpeiro?.length || 0})
+                              GARIMPEIRO ({garimpeiroDelegation.length || 0})
                             </h4>
                             <div className="space-y-2">
-                              {liveMap.delegation?.garimpeiro?.map((task, idx) => (
+                              {garimpeiroDelegation.map((task, idx) => (
                                 <div key={idx} className="text-xs text-gray-400">
                                   <Badge
                                     variant="outline"
                                     className="text-[10px] border-green-500/50 text-green-400 mb-1"
                                   >
-                                    {task.priority}
+                                    {task.priority || 'sem prioridade'}
                                   </Badge>
-                                  <p className="text-white">{task.description}</p>
+                                  <p className="text-white">{getDelegationLabel(task)}</p>
+                                  {task.duration_target && (
+                                    <p className="text-[10px] text-gray-500 mt-1">Duração alvo: {task.duration_target}</p>
+                                  )}
                                 </div>
                               ))}
                             </div>

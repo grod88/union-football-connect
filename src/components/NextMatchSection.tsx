@@ -3,7 +3,10 @@ import { NextMatchCard } from "@/presentation/components/match/NextMatchCard";
 import { useLanguage } from "@/i18n";
 import { TEAMS } from "@/config/constants";
 
-const YOUTUBE_LIVE_LINK = "https://www.youtube.com/watch?v=hBuqQbI09qY";
+const YOUTUBE_LINKS = {
+  SAO_PAULO: "https://youtube.com/live/YRmhsWDisJQ",
+  SANTOS: "https://youtube.com/live/fRfoKpuywBU",
+};
 
 const NextMatchSection = () => {
   const { t } = useLanguage();
@@ -22,11 +25,11 @@ const NextMatchSection = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
           <NextMatchCard
             teamId={TEAMS.SAO_PAULO}
-            youtubeLink={YOUTUBE_LIVE_LINK}
+            youtubeLink={YOUTUBE_LINKS.SAO_PAULO}
           />
           <NextMatchCard
             teamId={TEAMS.SANTOS}
-            youtubeLink={YOUTUBE_LIVE_LINK}
+            youtubeLink={YOUTUBE_LINKS.SANTOS}
           />
         </div>
       </div>

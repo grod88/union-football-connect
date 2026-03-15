@@ -194,7 +194,7 @@ const LiveDashboard = () => {
                 Assista às transmissões ao vivo no nosso canal:
               </p>
               <a
-                href="https://youtube.com/live/k7yPrXmla3M?feature=share"
+                href="https://youtube.com/live/YRmhsWDisJQ"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full text-center bg-accent text-accent-foreground font-heading uppercase tracking-wider text-sm px-4 py-2 rounded hover:opacity-90 transition-opacity"

@@ -16,6 +16,9 @@ from .base import (
     call_claude,
     parse_json_response,
 )
+from ..prompts import PRODUTOR_SYSTEM_PROMPT_V2
+from ..utils.agent_runtime import get_agent_runtime_preset
+from ..utils.produtor_dedup import deduplicate_worker_clips
 
 
 PRODUTOR_SYSTEM_PROMPT = """Você é o PRODUTOR, responsável por criar o PLANO DE PRODUÇÃO FINAL.
@@ -145,34 +148,48 @@ class ProdutorAgent:
     prioriza e gera especificações de produção.
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, model: Optional[str] = None, prompt_version: str = "v1"):
+        runtime = get_agent_runtime_preset("produtor", model_override=model)
         self.config = AgentConfig(
             name="produtor",
-            model=model,
-            max_tokens=16384,
-            temperature=0.5,  # Mais consistente
+            model=runtime.model,
+            max_tokens=runtime.max_tokens,
+            temperature=runtime.temperature,
+            top_p=runtime.top_p,
         )
+        self.system_prompt = PRODUTOR_SYSTEM_PROMPT_V2 if prompt_version == "v2" else PRODUTOR_SYSTEM_PROMPT
 
     def run(self, input_data: ProdutorInput) -> AgentResult:
-        """
-        Executa o Produtor nos clips dos workers.
+        """Executa o Produtor nos clips dos workers."""
+        deduped_clips, dropped_duplicates = deduplicate_worker_clips(
+            input_data.garimpeiro_clips,
+            input_data.cronista_clips,
+            input_data.analista_clips,
+        )
 
-        Args:
-            input_data: Clips de todos os workers
+        prepared_input = ProdutorInput(
+            garimpeiro_clips=deduped_clips["garimpeiro"],
+            cronista_clips=deduped_clips["cronista"],
+            analista_clips=deduped_clips["analista"],
+            live_summary=input_data.live_summary,
+            max_clips=input_data.max_clips,
+        )
 
-        Returns:
-            AgentResult com plano de produção
-        """
-        user_prompt = self._build_user_prompt(input_data)
+        user_prompt = self._build_user_prompt(prepared_input, dropped_duplicates)
 
         try:
             response_text, tokens_in, tokens_out = call_claude(
-                system_prompt=PRODUTOR_SYSTEM_PROMPT,
+                system_prompt=self.system_prompt,
                 user_prompt=user_prompt,
                 config=self.config,
             )
 
             data = parse_json_response(response_text)
+            existing_dropped = data.get("dropped_clips")
+            if isinstance(existing_dropped, list):
+                data["dropped_clips"] = dropped_duplicates + existing_dropped
+            else:
+                data["dropped_clips"] = dropped_duplicates
 
             return AgentResult(
                 agent_name=self.config.name,
@@ -183,52 +200,65 @@ class ProdutorAgent:
                 tokens_output=tokens_out,
             )
 
-        except Exception as e:
+        except Exception as error:
             return AgentResult(
                 agent_name=self.config.name,
                 success=False,
-                error=str(e),
+                error=str(error),
             )
 
-    def _build_user_prompt(self, input_data: ProdutorInput) -> str:
-        """Build user prompt with all worker outputs."""
+    def _build_user_prompt(
+        self,
+        input_data: ProdutorInput,
+        dropped_duplicates: Optional[List[Dict[str, Any]]] = None,
+    ) -> str:
+        """Build user prompt with worker outputs after deterministic dedup."""
         import json
 
-        parts = []
+        dropped_duplicates = dropped_duplicates or []
+        parts: list[str] = []
 
         if input_data.live_summary:
             parts.append(f"## RESUMO DA LIVE\n{input_data.live_summary}\n")
 
         parts.append(f"## LIMITE\nMáximo de {input_data.max_clips} clips no plano final.\n")
+        parts.append("## PRÉ-DEDUPLICAÇÃO APLICADA")
+        parts.append(
+            "Antes desta etapa, o sistema já removeu duplicatas óbvias por sobreposição forte de timestamps "
+            "entre workers. Foque em canibalização residual, mix final e priorização."
+        )
+        parts.append(f"Removidos automaticamente: {len(dropped_duplicates)} clips redundantes.")
+        if dropped_duplicates:
+            for dropped in dropped_duplicates:
+                parts.append(
+                    f"- [{dropped.get('source_agent')}] {dropped.get('source_clip_id')}: {dropped.get('reason')}"
+                )
+        parts.append("")
 
-        # Garimpeiro clips
         parts.append("## CLIPS DO GARIMPEIRO (Virais)")
         parts.append(f"Total: {len(input_data.garimpeiro_clips)} clips")
         for clip in input_data.garimpeiro_clips:
             parts.append(f"- [{clip.get('id')}] {clip.get('title')} ({clip.get('start_time')}-{clip.get('end_time')}s)")
-            if clip.get('key_phrase'):
+            if clip.get("key_phrase"):
                 parts.append(f"  Frase: \"{clip.get('key_phrase')}\"")
         parts.append("")
 
-        # Cronista clips
         parts.append("## CLIPS DO CRONISTA (Narrativos)")
         parts.append(f"Total: {len(input_data.cronista_clips)} clips")
         for clip in input_data.cronista_clips:
             parts.append(f"- [{clip.get('id')}] {clip.get('title')} ({clip.get('arc_type', 'arco')})")
-            if clip.get('story_summary'):
+            if clip.get("story_summary"):
                 parts.append(f"  História: {clip.get('story_summary')}")
         parts.append("")
 
-        # Analista clips
         parts.append("## CLIPS DO ANALISTA (Educacionais)")
         parts.append(f"Total: {len(input_data.analista_clips)} clips")
         for clip in input_data.analista_clips:
             parts.append(f"- [{clip.get('id')}] {clip.get('title')} ({clip.get('analysis_type', 'análise')})")
-            if clip.get('key_insight'):
+            if clip.get("key_insight"):
                 parts.append(f"  Insight: {clip.get('key_insight')}")
         parts.append("")
 
-        # Full data for reference
         parts.append("## DADOS COMPLETOS (JSON)")
         parts.append("### Garimpeiro")
         parts.append(json.dumps(input_data.garimpeiro_clips, ensure_ascii=False, indent=2))
@@ -236,12 +266,16 @@ class ProdutorAgent:
         parts.append(json.dumps(input_data.cronista_clips, ensure_ascii=False, indent=2))
         parts.append("\n### Analista")
         parts.append(json.dumps(input_data.analista_clips, ensure_ascii=False, indent=2))
+        parts.append("\n### Duplicados removidos")
+        parts.append(json.dumps(dropped_duplicates, ensure_ascii=False, indent=2))
 
-        parts.append("""
+        parts.append(
+            """
 ## TAREFA
 Analise todos os clips acima e crie o PLANO DE PRODUÇÃO FINAL.
-Elimine duplicatas, resolva conflitos, priorize e gere specs de produção.
-Retorne APENAS JSON no formato especificado.""")
+Elimine canibalizações remanescentes, resolva conflitos, priorize e gere specs de produção.
+Retorne APENAS JSON no formato especificado."""
+        )
 
         return "\n".join(parts)
 
@@ -252,23 +286,11 @@ def run_produtor(
     analista_clips: List[Dict[str, Any]],
     live_summary: Optional[str] = None,
     max_clips: int = 10,
-    model: str = "claude-sonnet-4-20250514",
+  model: Optional[str] = None,
+    prompt_version: str = "v1",
 ) -> AgentResult:
-    """
-    Função helper para rodar o Produtor.
-
-    Args:
-        garimpeiro_clips: Clips do Garimpeiro
-        cronista_clips: Clips do Cronista
-        analista_clips: Clips do Analista
-        live_summary: Resumo da live (do Diretor)
-        max_clips: Máximo de clips no plano final
-        model: Modelo Claude a usar
-
-    Returns:
-        AgentResult com plano de produção
-    """
-    agent = ProdutorAgent(model=model)
+    """Função helper para rodar o Produtor."""
+    agent = ProdutorAgent(model=model, prompt_version=prompt_version)
     input_data = ProdutorInput(
         garimpeiro_clips=garimpeiro_clips,
         cronista_clips=cronista_clips,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -60,6 +60,16 @@ interface WorkerLog {
   created_at: string;
 }
 
+interface CrewLogDetails extends Record<string, unknown> {
+  session_id?: string;
+  agent?: string;
+  prompt_version?: string;
+  model_override?: string | null;
+  tokens_used?: number;
+  clips_found?: number;
+  [key: string]: unknown;
+}
+
 const LEVEL_COLORS: Record<string, string> = {
   debug: 'text-gray-500',
   info: 'text-blue-400',
@@ -102,7 +112,37 @@ function formatDateTime(dateStr: string): string {
   });
 }
 
-function generateSessionLog(session: CrewSession): string {
+function formatLogDetails(details: CrewLogDetails | null | undefined): string[] {
+  if (!details) return [];
+
+  return Object.entries(details)
+    .filter(([key, value]) => key !== 'session_id' && value !== null && value !== undefined && value !== '')
+    .map(([key, value]) => {
+      const formattedValue = Array.isArray(value)
+        ? value.join(', ')
+        : typeof value === 'object'
+          ? JSON.stringify(value)
+          : String(value);
+
+      return `${key}: ${formattedValue}`;
+    });
+}
+
+function getLogAgent(log: WorkerLog): string {
+  const details = log.details as CrewLogDetails | null;
+  const detailsAgent = details?.agent;
+  if (typeof detailsAgent === 'string' && detailsAgent.length > 0) {
+    return detailsAgent;
+  }
+
+  if (log.step.startsWith('crew:')) {
+    return log.step.replace('crew:', '');
+  }
+
+  return log.step;
+}
+
+function generateSessionLog(session: CrewSession, logs: WorkerLog[]): string {
   const lines: string[] = [];
   const divider = '═'.repeat(60);
 
@@ -222,6 +262,20 @@ function generateSessionLog(session: CrewSession): string {
     lines.push(divider);
   }
 
+  if (logs.length > 0) {
+    lines.push('');
+    lines.push(divider);
+    lines.push('TERMINAL DA SESSÃO');
+    lines.push(divider);
+    logs.forEach((log) => {
+      const agent = getLogAgent(log);
+      const emoji = AGENT_EMOJIS[agent] || '🤖';
+      const details = formatLogDetails(log.details as CrewLogDetails | null);
+      lines.push(`${formatTime(log.created_at)} ${emoji} [${log.level.toUpperCase()}] ${agent} :: ${log.message}`);
+      details.forEach((detail) => lines.push(`   ${detail}`));
+    });
+  }
+
   return lines.join('\n');
 }
 
@@ -281,13 +335,33 @@ export default function ClipsLogs() {
       .from('worker_logs')
       .select('*')
       .eq('source_id', selectedSession.video_source_id)
-      .order('created_at', { ascending: false })
-      .limit(200);
+      .order('created_at', { ascending: true })
+      .limit(500);
 
     if (data) {
       setLogs(data);
     }
   }, [selectedSession?.video_source_id]);
+
+  const sessionLogs = useMemo(() => {
+    if (!selectedSession) return [];
+
+    return logs.filter((log) => {
+      const details = log.details as CrewLogDetails | null;
+      if (details?.session_id) {
+        return details.session_id === selectedSession.id;
+      }
+
+      return false;
+    });
+  }, [logs, selectedSession]);
+
+  const sourceOnlyLogs = useMemo(() => {
+    return logs.filter((log) => {
+      const details = log.details as CrewLogDetails | null;
+      return !details?.session_id;
+    });
+  }, [logs]);
 
   // Initial load
   useEffect(() => {
@@ -559,21 +633,57 @@ export default function ClipsLogs() {
                     </div>
                   )}
 
-                  {/* Worker Logs */}
-                  {logs.length > 0 && (
+                  {/* Session Terminal */}
+                  {sessionLogs.length > 0 && (
                     <div className="bg-gray-800/50 rounded-lg p-4">
                       <h3 className="text-sm font-bold text-gray-400 mb-3 flex items-center gap-2">
-                        <Terminal className="w-4 h-4" /> WORKER LOGS ({logs.length})
+                        <Terminal className="w-4 h-4 text-green-500" /> TERMINAL DA SESSÃO ({sessionLogs.length})
                       </h3>
-                      <div className="space-y-1 max-h-[300px] overflow-y-auto font-mono text-xs">
-                        {logs.slice(0, 50).map((log) => (
+                      <div className="space-y-2 max-h-[360px] overflow-y-auto font-mono text-xs bg-black/40 rounded-lg p-3 border border-gray-700">
+                        {sessionLogs.map((log) => {
+                          const details = log.details as CrewLogDetails | null;
+                          const agent = getLogAgent(log);
+                          const detailLines = formatLogDetails(details);
+
+                          return (
+                            <div key={log.id} className="border-b border-gray-800 pb-2 last:border-b-0 last:pb-0">
+                              <div className="flex items-start gap-2 flex-wrap">
+                                <span className="text-gray-600 shrink-0">{formatTime(log.created_at)}</span>
+                                <span className={`shrink-0 w-14 ${LEVEL_COLORS[log.level] || 'text-gray-500'}`}>
+                                  [{log.level}]
+                                </span>
+                                <span className="text-purple-400 shrink-0">{AGENT_EMOJIS[agent] || '🤖'} {agent}</span>
+                                <span className="text-gray-200 flex-1">{log.message}</span>
+                              </div>
+                              {detailLines.length > 0 && (
+                                <div className="mt-1 pl-[132px] text-gray-500 space-y-1">
+                                  {detailLines.map((detail) => (
+                                    <div key={`${log.id}-${detail}`}>↳ {detail}</div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Source Logs */}
+                  {sourceOnlyLogs.length > 0 && (
+                    <div className="bg-gray-800/30 rounded-lg p-4">
+                      <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-2">
+                        <Info className="w-4 h-4" /> LOGS DO PIPELINE BASE ({sourceOnlyLogs.length})
+                      </h3>
+                      <div className="space-y-1 max-h-[220px] overflow-y-auto font-mono text-xs">
+                        {sourceOnlyLogs.slice(-40).map((log) => (
                           <div key={log.id} className="flex items-start gap-2">
                             <span className="text-gray-600 shrink-0">{formatTime(log.created_at)}</span>
                             <span className={`shrink-0 w-12 ${LEVEL_COLORS[log.level] || 'text-gray-500'}`}>
                               [{log.level}]
                             </span>
-                            <span className="text-purple-400 shrink-0 w-20">[{log.step}]</span>
-                            <span className="text-gray-300">{log.message}</span>
+                            <span className="text-purple-400 shrink-0 w-24">[{log.step}]</span>
+                            <span className="text-gray-400">{log.message}</span>
                           </div>
                         ))}
                       </div>
@@ -601,7 +711,7 @@ export default function ClipsLogs() {
             </DialogHeader>
             <div className="overflow-y-auto max-h-[75vh] p-4">
               <pre className="text-sm text-green-400 whitespace-pre-wrap font-mono bg-black p-4 rounded-lg leading-relaxed">
-                {selectedSession ? generateSessionLog(selectedSession) : 'No session selected'}
+                {selectedSession ? generateSessionLog(selectedSession, sessionLogs) : 'No session selected'}
               </pre>
             </div>
           </DialogContent>

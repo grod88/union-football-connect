@@ -21,7 +21,7 @@ interface LiveMatchCardProps {
 export const LiveMatchCard = ({
   fixture,
   showActions = true,
-  youtubeLink = 'https://youtube.com/live/MufGuq-x4qE?feature=share',
+  youtubeLink = 'https://youtube.com/live/YRmhsWDisJQ',
   className = '',
 }: LiveMatchCardProps) => {
   const isLive = isFixtureLive(fixture);

@@ -16,6 +16,8 @@ from .base import (
     call_claude,
     parse_json_response,
 )
+from ..prompts import CRITICO_SYSTEM_PROMPT_V2
+from ..utils.agent_runtime import get_agent_runtime_preset
 
 
 CRITICO_SYSTEM_PROMPT = """Você é o CRÍTICO, especialista em avaliar a qualidade de clips de futebol.
@@ -151,13 +153,16 @@ class CriticoAgent:
     aprovando, pedindo refinamentos ou rejeitando.
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, model: Optional[str] = None, prompt_version: str = "v1"):
+        runtime = get_agent_runtime_preset("critico", model_override=model)
         self.config = AgentConfig(
             name="critico",
-            model=model,
-            max_tokens=12288,
-            temperature=0.3,  # Mais consistente nas avaliações
+            model=runtime.model,
+            max_tokens=runtime.max_tokens,
+            temperature=runtime.temperature,
+            top_p=runtime.top_p,
         )
+        self.system_prompt = CRITICO_SYSTEM_PROMPT_V2 if prompt_version == "v2" else CRITICO_SYSTEM_PROMPT
 
     def run(self, input_data: CriticoInput) -> AgentResult:
         """
@@ -173,7 +178,7 @@ class CriticoAgent:
 
         try:
             response_text, tokens_in, tokens_out = call_claude(
-                system_prompt=CRITICO_SYSTEM_PROMPT,
+                system_prompt=self.system_prompt,
                 user_prompt=user_prompt,
                 config=self.config,
             )
@@ -235,7 +240,8 @@ def run_critico(
     production_plan: Dict[str, Any],
     clips: List[Dict[str, Any]],
     iteration: int = 1,
-    model: str = "claude-sonnet-4-20250514",
+  model: Optional[str] = None,
+    prompt_version: str = "v1",
 ) -> AgentResult:
     """
     Função helper para rodar o Crítico.
@@ -249,7 +255,7 @@ def run_critico(
     Returns:
         AgentResult com avaliações
     """
-    agent = CriticoAgent(model=model)
+    agent = CriticoAgent(model=model, prompt_version=prompt_version)
     input_data = CriticoInput(
         production_plan=production_plan,
         clips=clips,
