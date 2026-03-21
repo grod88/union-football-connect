@@ -35,8 +35,7 @@ const EMOTION_BADGE_COLORS: Record<string, string> = {
 
 /* Jogos fixos da live de hoje */
 const TODAYS_MATCHES = [
-  { id: 1492161, label: 'BRA × SAO', home: 'Bragantino', away: 'São Paulo', league: 'Brasileirão', emoji: '🟢⚪🔴' },
-  { id: 1492168, label: 'SAN × COR', home: 'Santos', away: 'Corinthians', league: 'Brasileirão', emoji: '⚪⚫🖤' },
+  { id: 1492187, label: 'SAO × PAL', home: 'São Paulo', away: 'Palmeiras', league: 'Brasileirão', emoji: '🔴⚪🟢' },
 ] as const;
 
 const FIXTURE_LABELS: Record<number, string> = Object.fromEntries(
