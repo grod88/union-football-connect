@@ -71,18 +71,21 @@ const CountdownTimer = ({ targetDate }: CountdownTimerProps) => {
 
 interface NextMatchCardProps {
   teamId?: number;
+  fixture?: Fixture;
   youtubeLink?: string;
   className?: string;
 }
 
 export const NextMatchCard = ({
   teamId,
-  youtubeLink = 'https://youtube.com/live/YRmhsWDisJQ',
+  fixture: fixtureProp,
+  youtubeLink = '',
   className = '',
 }: NextMatchCardProps) => {
-  const { data: fixture, isLoading, error } = useNextMatch({ teamId });
+  const { data: fetchedFixture, isLoading, error } = useNextMatch({ teamId, enabled: !fixtureProp });
+  const fixture = fixtureProp || fetchedFixture;
 
-  if (isLoading) {
+  if (isLoading && !fixtureProp) {
     return (
       <div className={`card-surface rounded-xl p-10 flex items-center justify-center ${className}`}>
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -169,15 +172,17 @@ export const NextMatchCard = ({
 
       {/* Buttons */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        <a
-          href={youtubeLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 gold-gradient text-primary-foreground font-heading uppercase tracking-wider px-8 py-3 rounded-lg hover:opacity-90 transition-opacity"
-        >
-          <ExternalLink size={18} />
-          Assistir Live
-        </a>
+        {youtubeLink && (
+          <a
+            href={youtubeLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 gold-gradient text-primary-foreground font-heading uppercase tracking-wider px-8 py-3 rounded-lg hover:opacity-90 transition-opacity"
+          >
+            <ExternalLink size={18} />
+            Assistir Live
+          </a>
+        )}
         <div className="flex gap-2">
           <button
             onClick={handleDownloadICS}

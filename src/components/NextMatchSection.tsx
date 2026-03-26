@@ -2,14 +2,17 @@ import { motion } from "framer-motion";
 import { NextMatchCard } from "@/presentation/components/match/NextMatchCard";
 import { useLanguage } from "@/i18n";
 import { TEAMS } from "@/config/constants";
+import { useUpcomingMatches } from "@/application/hooks/useNextMatch";
+import { Loader2 } from "lucide-react";
 
-const YOUTUBE_LINKS = {
-  SAO_PAULO: "https://youtube.com/live/YRmhsWDisJQ",
-  SANTOS: "https://youtube.com/live/fRfoKpuywBU",
+const YOUTUBE_LINKS: Record<number, string> = {
+  // Brasil x França - 26/03 e Brasil x Croácia - 31/03
+  // Adicionar links quando disponíveis
 };
 
 const NextMatchSection = () => {
   const { t } = useLanguage();
+  const { data: fixtures, isLoading } = useUpcomingMatches({ teamId: TEAMS.BRASIL, count: 2 });
 
   return (
     <section className="py-20 px-4">
@@ -22,16 +25,21 @@ const NextMatchSection = () => {
         >
           {t.nextMatch.title}
         </motion.h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          <NextMatchCard
-            teamId={TEAMS.SAO_PAULO}
-            youtubeLink={YOUTUBE_LINKS.SAO_PAULO}
-          />
-          <NextMatchCard
-            teamId={TEAMS.SANTOS}
-            youtubeLink={YOUTUBE_LINKS.SANTOS}
-          />
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {fixtures?.slice(0, 2).map((fixture) => (
+              <NextMatchCard
+                key={fixture.id}
+                fixture={fixture}
+                youtubeLink={YOUTUBE_LINKS[fixture.id] || ""}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

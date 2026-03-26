@@ -34,6 +34,9 @@ export const TEAMS = {
   INTERNACIONAL: 119,
   ATLETICO_MG: 1062,
   CRUZEIRO: 129,
+  BRASIL: 6,
+  FRANCA: 2,
+  CROACIA: 3,
 } as const;
 
 // Current season

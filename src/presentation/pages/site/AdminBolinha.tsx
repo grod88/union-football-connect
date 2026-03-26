@@ -33,9 +33,10 @@ const EMOTION_BADGE_COLORS: Record<string, string> = {
   neutro: 'bg-gray-600',
 };
 
-/* Jogos fixos da live de hoje */
+/* Jogos fixos da live - Amistosos Brasil Data FIFA */
 const TODAYS_MATCHES = [
-  { id: 1492187, label: 'SAO × PAL', home: 'São Paulo', away: 'Palmeiras', league: 'Brasileirão', emoji: '🔴⚪🟢' },
+  { id: 1501815, label: 'BRA × FRA', home: 'Brasil', away: 'França', league: 'Amistoso', emoji: '🇧🇷🇫🇷' },
+  { id: 1501817, label: 'BRA × CRO', home: 'Brasil', away: 'Croácia', league: 'Amistoso', emoji: '🇧🇷🇭🇷' },
 ] as const;
 
 const FIXTURE_LABELS: Record<number, string> = Object.fromEntries(
